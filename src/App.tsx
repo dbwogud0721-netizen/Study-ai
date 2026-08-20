@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AppContext, AppState } from './hooks/useAppStore'
 import { User, ExamConfig, ExamBlueprint, Question, StudentUser } from './types'
 import type { ExamResult as ExamResultData } from './types'
 import { getCurrentUser } from './services/authService'
+import { seedDemoHistoryIfEmpty } from './services/examService'
 
 import Onboarding from './pages/Onboarding'
 import Login from './pages/Login'
@@ -48,6 +49,12 @@ export default function App() {
   const [pendingBlueprint, setPendingBlueprint] = useState<ExamBlueprint | null>(null)
   const [pendingQuestions, setPendingQuestions] = useState<Question[] | null>(null)
   const [currentExamResult, setCurrentExamResult] = useState<ExamResultData | null>(null)
+
+  useEffect(() => {
+    if (user && user.accountType !== 'parent') {
+      seedDemoHistoryIfEmpty(user.id)
+    }
+  }, [user])
 
   const ctx: AppState = {
     user,

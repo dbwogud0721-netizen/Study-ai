@@ -3,7 +3,8 @@ import { Sparkles, Target, BookOpen, ChevronRight } from 'lucide-react'
 import { MobileLayout } from '../components/layout/MobileLayout'
 import { BottomNav } from '../components/layout/BottomNav'
 import { useAppStore } from '../hooks/useAppStore'
-import { MOCK_CONCEPT_STRENGTHS } from '../data/mockExamHistory'
+import { getExamHistory } from '../services/examService'
+import { calculateConceptAccuracy } from '../services/analytics'
 import { StudentUser } from '../types'
 
 export default function AILearn() {
@@ -12,7 +13,9 @@ export default function AILearn() {
   const student = user as StudentUser
   const isMiddle = student.schoolLevel === 'middle'
 
-  const weak = MOCK_CONCEPT_STRENGTHS.filter((c) => c.status === 'weak')
+  const history = getExamHistory(student.id)
+  const conceptAcc = calculateConceptAccuracy(history.flatMap((r) => r.attempts), history.flatMap((r) => r.questions))
+  const weak = conceptAcc.filter((c) => c.accuracy < 70)
 
   return (
     <MobileLayout>
@@ -31,10 +34,11 @@ export default function AILearn() {
             <p className="text-lg font-bold mb-3">지금 집중해야 할 개념</p>
             <div className="flex flex-wrap gap-2">
               {weak.map((c) => (
-                <span key={c.concept} className="bg-white/20 text-white text-sm font-semibold px-3 py-1.5 rounded-xl">
-                  {c.concept} {c.accuracy}%
+                <span key={c.key} className="bg-white/20 text-white text-sm font-semibold px-3 py-1.5 rounded-xl">
+                  {c.label} {c.accuracy}%
                 </span>
               ))}
+              {weak.length === 0 && <span className="text-sm opacity-80">아직 데이터가 부족해요</span>}
             </div>
           </div>
         </div>
@@ -77,23 +81,24 @@ export default function AILearn() {
         <div className="px-5 mt-5">
           <h2 className="font-black text-gray-900 mb-3">개념별 현황</h2>
           <div className="bg-white rounded-card p-4 space-y-3">
-            {MOCK_CONCEPT_STRENGTHS.map((c) => (
-              <div key={c.concept} className="flex items-center gap-3">
-                <span className={`w-1.5 h-6 rounded-full flex-shrink-0 ${c.status === 'strong' ? 'bg-green-400' : 'bg-red-400'}`} />
-                <span className="flex-1 text-sm font-medium text-gray-700">{c.concept}</span>
+            {conceptAcc.map((c) => (
+              <div key={c.key} className="flex items-center gap-3">
+                <span className={`w-1.5 h-6 rounded-full flex-shrink-0 ${c.accuracy >= 70 ? 'bg-green-400' : 'bg-red-400'}`} />
+                <span className="flex-1 text-sm font-medium text-gray-700">{c.label}</span>
                 <div className="flex items-center gap-2">
                   <div className="w-20 h-1.5 bg-gray-100 rounded-full">
                     <div
-                      className={`h-1.5 rounded-full ${c.status === 'strong' ? 'bg-green-400' : 'bg-red-400'}`}
+                      className={`h-1.5 rounded-full ${c.accuracy >= 70 ? 'bg-green-400' : 'bg-red-400'}`}
                       style={{ width: `${c.accuracy}%` }}
                     />
                   </div>
-                  <span className={`text-xs font-bold w-8 text-right ${c.status === 'strong' ? 'text-green-500' : 'text-red-400'}`}>
+                  <span className={`text-xs font-bold w-8 text-right ${c.accuracy >= 70 ? 'text-green-500' : 'text-red-400'}`}>
                     {c.accuracy}%
                   </span>
                 </div>
               </div>
             ))}
+            {conceptAcc.length === 0 && <p className="text-sm text-gray-400 text-center py-4">아직 데이터가 부족해요</p>}
           </div>
         </div>
       </div>

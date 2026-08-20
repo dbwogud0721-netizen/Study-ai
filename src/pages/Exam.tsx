@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, Flag } from 'lucide-react'
 import { MobileLayout } from '../components/layout/MobileLayout'
@@ -10,7 +10,14 @@ import { useExamTimer, formatTime } from '../hooks/useExamTimer'
 import { buildExamResult } from '../services/examService'
 import { recordTransaction } from '../services/tokenService'
 import { saveUser } from '../services/authService'
-import { StudentUser } from '../types'
+import { StudentUser, QuestionAttempt } from '../types'
+
+interface AttemptTrack {
+  firstSelectedAnswer?: number
+  selectedAnswer?: number
+  answerChangeCount: number
+  accumulatedMs: number
+}
 
 export default function Exam() {
   const navigate = useNavigate()
@@ -27,6 +34,8 @@ export default function Exam() {
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [startTime] = useState(Date.now())
+  const [attemptTracker, setAttemptTracker] = useState<Record<string, AttemptTrack>>({})
+  const enterTimeRef = useRef(Date.now())
 
   const timeLimit = (config?.timeLimitMinutes ?? 20) * 60
   const { seconds, pause } = useExamTimer(timeLimit, () => handleSubmit())
@@ -41,8 +50,31 @@ export default function Exam() {
   const unansweredCount = questions.length - answeredCount
   const isFlagged = flaggedIds.includes(q.questionId)
 
+  /** 문항 이탈 시 그동안 머문 시간을 해당 문항에 누적한다 */
+  const flushTime = (questionId: string) => {
+    const now = Date.now()
+    const elapsedMs = now - enterTimeRef.current
+    enterTimeRef.current = now
+    setAttemptTracker((prev) => {
+      const cur = prev[questionId] ?? { answerChangeCount: 0, accumulatedMs: 0 }
+      return { ...prev, [questionId]: { ...cur, accumulatedMs: cur.accumulatedMs + elapsedMs } }
+    })
+  }
+
+  const goToIndex = (newIndex: number) => {
+    flushTime(q.questionId)
+    setCurrentIndex(newIndex)
+  }
+
   const handleSelect = (choiceIndex: number) => {
     setAnswers((prev) => ({ ...prev, [q.questionId]: choiceIndex }))
+    setAttemptTracker((prev) => {
+      const cur = prev[q.questionId] ?? { answerChangeCount: 0, accumulatedMs: 0 }
+      const hadPriorSelection = cur.selectedAnswer !== undefined
+      const firstSelectedAnswer = cur.firstSelectedAnswer ?? choiceIndex
+      const answerChangeCount = hadPriorSelection && cur.selectedAnswer !== choiceIndex ? cur.answerChangeCount + 1 : cur.answerChangeCount
+      return { ...prev, [q.questionId]: { firstSelectedAnswer, selectedAnswer: choiceIndex, answerChangeCount, accumulatedMs: cur.accumulatedMs } }
+    })
   }
 
   const toggleFlag = () => {
@@ -52,9 +84,31 @@ export default function Exam() {
   const handleSubmit = async () => {
     if (submitting) return
     pause()
+    flushTime(q.questionId)
     setSubmitting(true)
     const duration = Math.floor((Date.now() - startTime) / 1000)
-    const result = await buildExamResult(config, questions, answers, student.id, duration, flaggedIds)
+
+    const attempts: QuestionAttempt[] = questions.map((qq, idx) => {
+      const t = attemptTracker[qq.questionId]
+      const selectedAnswer = answers[qq.questionId] ?? -1
+      return {
+        id: `att_${qq.questionId}_${idx}`,
+        userId: student.id,
+        examId: '',
+        questionId: qq.questionId,
+        selectedAnswer,
+        firstSelectedAnswer: t?.firstSelectedAnswer,
+        correctAnswer: qq.correctAnswer,
+        isCorrect: selectedAnswer === qq.correctAnswer,
+        responseTimeSeconds: Math.round((t?.accumulatedMs ?? 0) / 1000),
+        answerChangeCount: t?.answerChangeCount ?? 0,
+        flagged: flaggedIds.includes(qq.questionId),
+        questionPosition: idx + 1,
+        answeredAt: new Date().toISOString(),
+      }
+    })
+
+    const result = await buildExamResult(config, questions, answers, student.id, duration, flaggedIds, attempts)
 
     const { balanceAfter } = recordTransaction(student.id, student.tokens, 'EARN', result.tokensEarned, `${config.subjectName} 시험 ${result.score}점 보상`)
     const updatedUser: StudentUser = { ...student, tokens: balanceAfter }
@@ -146,7 +200,7 @@ export default function Exam() {
             variant="secondary"
             size="sm"
             disabled={currentIndex === 0}
-            onClick={() => setCurrentIndex(currentIndex - 1)}
+            onClick={() => goToIndex(currentIndex - 1)}
             className="flex-1"
           >
             ← 이전
@@ -161,7 +215,7 @@ export default function Exam() {
             variant={currentIndex < questions.length - 1 ? 'primary' : 'secondary'}
             size="sm"
             disabled={currentIndex === questions.length - 1}
-            onClick={() => setCurrentIndex(currentIndex + 1)}
+            onClick={() => goToIndex(currentIndex + 1)}
             className="flex-1"
           >
             다음 →
@@ -175,7 +229,7 @@ export default function Exam() {
           answers={answers}
           currentIndex={currentIndex}
           flaggedIds={flaggedIds}
-          onSelect={(i) => { setCurrentIndex(i); setShowNav(false) }}
+          onSelect={(i) => { goToIndex(i); setShowNav(false) }}
         />
       </BottomSheet>
 

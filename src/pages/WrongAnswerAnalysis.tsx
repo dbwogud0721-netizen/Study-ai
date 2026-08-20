@@ -8,6 +8,7 @@ import { Card } from '../components/ui/Card'
 import { BottomSheet } from '../components/ui/BottomSheet'
 import { useAppStore } from '../hooks/useAppStore'
 import { generateQuestion } from '../services/aiService'
+import { getExamResultById } from '../services/examService'
 import { Question } from '../types'
 
 export default function WrongAnswerAnalysis() {
@@ -21,7 +22,8 @@ export default function WrongAnswerAnalysis() {
   const [similarAnswer, setSimilarAnswer] = useState<number | null>(null)
   const [showSimilarResult, setShowSimilarResult] = useState(false)
 
-  const result = currentExamResult
+  // 방금 끝낸 세션이면 컨텍스트에서, 대시보드 등에서 옛 시험을 다시 열람하는 경우엔 저장된 이력에서 찾는다
+  const result = currentExamResult?.examId === examId ? currentExamResult : getExamResultById(examId ?? '') ?? currentExamResult
   if (!result) { navigate('/home'); return null }
 
   const q = result.questions.find((q) => q.questionId === questionId)
@@ -30,6 +32,7 @@ export default function WrongAnswerAnalysis() {
   const myAnswer = result.answers[q.questionId]
   const isCorrect = myAnswer === q.correctAnswer
   const whyWrong = getWhyWrong(q, myAnswer)
+  const attempt = result.attempts?.find((a) => a.questionId === q.questionId)
 
   const handleSimilar = async () => {
     setLoadingQ(true)
@@ -109,6 +112,26 @@ export default function WrongAnswerAnalysis() {
             {q.concept}
           </span>
         </Card>
+
+        {/* 풀이 데이터 (섹션 6) */}
+        {attempt && (
+          <Card>
+            <h3 className="font-bold text-gray-900 mb-2">풀이 데이터</h3>
+            <div className="flex justify-between text-sm mb-1">
+              <span className="text-gray-500">풀이 시간</span>
+              <span className="font-bold text-gray-900">{Math.floor(attempt.responseTimeSeconds / 60)}분 {attempt.responseTimeSeconds % 60}초</span>
+            </div>
+            {attempt.answerChangeCount > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">답 변경</span>
+                <span className="font-bold text-amber-600">
+                  {attempt.answerChangeCount}회
+                  {attempt.firstSelectedAnswer === attempt.correctAnswer && !attempt.isCorrect ? ' · 정답에서 오답으로 변경했어요' : ''}
+                </span>
+              </div>
+            )}
+          </Card>
+        )}
 
         {/* 왜 틀렸을까 */}
         {!isCorrect && (

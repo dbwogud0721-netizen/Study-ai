@@ -1,8 +1,10 @@
-import { Question, ExamConfig, ExamBlueprint, BlueprintItem, ConceptAnalysis } from '../types'
+import { Question, ExamConfig, ExamBlueprint, BlueprintItem, ConceptAnalysis, QuestionAttempt } from '../types'
 import { MOCK_QUESTIONS } from '../data/mockQuestions'
 import { MOCK_CONCEPT_STRENGTHS } from '../data/mockExamHistory'
 import { getExamModeDef } from '../config/examModeConfig'
 import { TOKEN_COSTS } from '../config/tokenConfig'
+import { getFullMockBlueprint, getSubjectTaxonomy } from '../config/curriculumConfig'
+import { generateRecommendedExam as generateRecommendedExamFromHistory } from './analytics'
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -33,12 +35,78 @@ function buildBalancedDistribution(topics: string[], total: number): BlueprintIt
   }))
 }
 
-// topicPool: 해당 과목의 단원명 목록(있으면) — Blueprint의 영역 분포를 만드는 데 사용된다.
-export async function generateExamBlueprint(config: ExamConfig, topicPool: string[] = []): Promise<ExamBlueprint> {
+/** taxonomy가 등록된 과목의 대영역 하나를 문항수만큼 균등 분배(전체 영역 선택 시, 섹션 25) */
+function buildAreaEvenDistribution(subjectName: string, majorAreaId: string, total: number): BlueprintItem[] {
+  const taxonomy = getSubjectTaxonomy(subjectName)
+  const major = taxonomy?.find((m) => m.id === majorAreaId || m.name === majorAreaId)
+  if (!major || major.middleAreas.length === 0) return [{ label: majorAreaId, count: total }]
+  const n = major.middleAreas.length
+  const base = Math.floor(total / n)
+  return major.middleAreas.map((mid, i) => ({
+    label: mid.name,
+    count: i === n - 1 ? total - base * (n - 1) : base,
+  }))
+}
+
+interface WeaknessSource {
+  attempts: QuestionAttempt[]
+  questions: Question[]
+}
+
+/**
+ * topicPool: 해당 과목의 단원명 목록(있으면) — Blueprint의 영역 분포를 만드는 데 사용된다.
+ * weaknessSource: weakness_ai 모드에서 실제 이력 기반 추천을 만들 때 쓰는 attempts/questions(호출부에서 examService.getExamHistory로 조회해 주입).
+ */
+export async function generateExamBlueprint(
+  config: ExamConfig,
+  topicPool: string[] = [],
+  weaknessSource?: WeaknessSource
+): Promise<ExamBlueprint> {
   await delay(500)
   const modeDef = getExamModeDef(config.schoolLevel, config.examMode)
   const tokenCost = TOKEN_COSTS[config.examMode] ?? 3
 
+  // AI 취약영역 모의고사: 실 이력이 충분하면 Analytics Engine의 추천 결과를 그대로 사용(섹션 16)
+  if (config.examMode === 'weakness_ai' && weaknessSource && weaknessSource.attempts.length >= 10) {
+    return generateRecommendedExamFromHistory(weaknessSource.attempts, weaknessSource.questions, config.subjectName, config.questionCount)
+  }
+
+  // 전체 모의고사: 과목별 고정 구성(예: 국어 독서17/문학17/언어와매체11)
+  if (config.examType === 'FULL_MOCK') {
+    const full = getFullMockBlueprint(config.subjectName)
+    if (full) {
+      return {
+        title: `${config.subjectName} 전체 모의고사`,
+        examModeLabel: modeDef?.label ?? '전체 모의고사',
+        totalQuestions: full.totalQuestions,
+        distribution: full.distribution,
+        estimatedMinutes: full.timeLimitMinutes,
+        tokenCost,
+      }
+    }
+  }
+
+  // 영역별 모의고사: taxonomy 기반(대영역 전체 또는 중영역 하나)
+  if (config.examType === 'AREA_MOCK' && config.targetMajorArea) {
+    const taxonomy = getSubjectTaxonomy(config.subjectName)
+    const major = taxonomy?.find((m) => m.id === config.targetMajorArea || m.name === config.targetMajorArea)
+    if (major) {
+      const distribution: BlueprintItem[] = config.targetMiddleArea
+        ? [{ label: config.targetMiddleArea, count: config.questionCount }]
+        : buildAreaEvenDistribution(config.subjectName, config.targetMajorArea, config.questionCount)
+
+      return {
+        title: `${config.subjectName} ${config.targetMiddleArea ?? major.name} 모의고사`,
+        examModeLabel: modeDef?.label ?? '영역별 모의고사',
+        totalQuestions: config.questionCount,
+        distribution,
+        estimatedMinutes: config.timeLimitMinutes,
+        tokenCost,
+      }
+    }
+  }
+
+  // 폴백: taxonomy 없는 과목/기존 내신형 흐름
   let distribution: BlueprintItem[]
   if (config.examMode === 'weakness_ai') {
     distribution = buildWeaknessDistribution(config.questionCount)
@@ -64,7 +132,7 @@ export async function generateExam(config: ExamConfig, blueprint?: ExamBlueprint
   const basePool = subjectPool.length > 0 ? subjectPool : MOCK_QUESTIONS
 
   if (!blueprint) {
-    return shuffle(basePool).slice(0, config.questionCount)
+    return assignPositions(shuffle(basePool).slice(0, config.questionCount))
   }
 
   const picked: Question[] = []
@@ -72,7 +140,16 @@ export async function generateExam(config: ExamConfig, blueprint?: ExamBlueprint
 
   for (const item of blueprint.distribution) {
     const matched = shuffle(
-      basePool.filter((q) => !usedIds.has(q.questionId) && (q.concept.includes(item.label) || q.unit.includes(item.label) || item.label.includes(q.concept)))
+      basePool.filter(
+        (q) =>
+          !usedIds.has(q.questionId) &&
+          (q.majorArea === item.label ||
+            q.middleArea === item.label ||
+            q.minorArea === item.label ||
+            q.concept.includes(item.label) ||
+            q.unit.includes(item.label) ||
+            item.label.includes(q.concept))
+      )
     )
     const take = matched.slice(0, item.count)
     take.forEach((q) => usedIds.add(q.questionId))
@@ -98,7 +175,11 @@ export async function generateExam(config: ExamConfig, blueprint?: ExamBlueprint
     picked.push({ ...src, questionId: `${src.questionId}_dup${dupCount}` })
   }
 
-  return shuffle(picked).slice(0, config.questionCount)
+  return assignPositions(shuffle(picked).slice(0, config.questionCount))
+}
+
+function assignPositions(questions: Question[]): Question[] {
+  return questions.map((q, i) => ({ ...q, questionPosition: i + 1 }))
 }
 
 function shuffle<T>(arr: T[]): T[] {

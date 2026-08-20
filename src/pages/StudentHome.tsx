@@ -8,7 +8,8 @@ import { ExamHistoryItem } from '../components/features/ExamHistoryItem'
 import { ScoreChart } from '../components/ui/ScoreChart'
 import { useAppStore } from '../hooks/useAppStore'
 import { MOCK_RECOMMENDATIONS } from '../data/recommendations'
-import { MOCK_EXAM_HISTORY, MOCK_CONCEPT_STRENGTHS } from '../data/mockExamHistory'
+import { getExamHistory } from '../services/examService'
+import { generateAIInsight } from '../services/analytics'
 import { TOKEN_COSTS } from '../config/tokenConfig'
 import { getCsatDday } from '../utils/academicYear'
 import { StudentUser } from '../types'
@@ -46,8 +47,11 @@ function TopBar({ student }: { student: StudentUser }) {
 
 function MiddleHome({ student }: { student: StudentUser }) {
   const navigate = useNavigate()
-  const recent = MOCK_EXAM_HISTORY.slice(0, 3)
-  const topWeak = MOCK_CONCEPT_STRENGTHS.filter((c) => c.status === 'weak').sort((a, b) => a.accuracy - b.accuracy)[0]
+  const history = getExamHistory(student.id)
+  const recent = history.slice(0, 3)
+  const attempts = history.flatMap((r) => r.attempts)
+  const questions = history.flatMap((r) => r.questions)
+  const insight = attempts.length >= 10 ? generateAIInsight(attempts, questions) : null
   const rec = MOCK_RECOMMENDATIONS[0]
 
   return (
@@ -87,11 +91,11 @@ function MiddleHome({ student }: { student: StudentUser }) {
           />
         </div>
 
-        {topWeak && (
+        {insight && (
           <div className="px-5 mt-4">
             <AIInsightCard
               title="AI가 발견한 취약점"
-              message={`${topWeak.concept} 정답률이 ${topWeak.accuracy}%로 낮아요. 취약점 테스트로 집중 보완해보세요.`}
+              message={insight.chain[0]}
               action={{ label: '취약점 테스트', onClick: () => navigate('/exam/new?mode=weakness_ai') }}
             />
           </div>
@@ -106,8 +110,18 @@ function MiddleHome({ student }: { student: StudentUser }) {
           </div>
           <div className="space-y-2">
             {recent.map((h) => (
-              <ExamHistoryItem key={h.examId} subject={h.subject} unit={h.unit} date={h.date} questionCount={h.questionCount} score={h.score} tokensEarned={h.tokensEarned} onClick={() => navigate('/grades')} />
+              <ExamHistoryItem
+                key={h.examId}
+                subject={h.config.subjectName}
+                unit={h.config.targetMiddleArea || h.config.targetMajorArea || h.config.unitName || '전체'}
+                date={h.completedAt}
+                questionCount={h.questions.length}
+                score={h.score}
+                tokensEarned={h.tokensEarned}
+                onClick={() => navigate('/grades')}
+              />
             ))}
+            {recent.length === 0 && <p className="text-sm text-gray-400 text-center py-6">아직 응시한 시험이 없어요</p>}
           </div>
         </div>
       </div>
@@ -119,7 +133,11 @@ function MiddleHome({ student }: { student: StudentUser }) {
 function HighHome({ student }: { student: StudentUser }) {
   const navigate = useNavigate()
   const dday = getCsatDday(student.entryYear)
-  const trend = MOCK_EXAM_HISTORY.slice(0, 5).reverse().map((h) => ({ label: h.date.slice(5), score: h.score }))
+  const history = getExamHistory(student.id)
+  const attempts = history.flatMap((r) => r.attempts)
+  const questions = history.flatMap((r) => r.questions)
+  const insight = attempts.length >= 10 ? generateAIInsight(attempts, questions) : null
+  const trend = history.slice(0, 5).reverse().map((h) => ({ label: h.completedAt.slice(5, 10), score: h.score }))
 
   return (
     <MobileLayout>
@@ -169,13 +187,15 @@ function HighHome({ student }: { student: StudentUser }) {
           </div>
         </div>
 
-        <div className="px-5 mt-4">
-          <AIInsightCard
-            title="AI 분석"
-            message="확률과 통계 유형에서 평균보다 시간이 오래 걸리고 있어요. 개념을 다시 점검해보는 걸 추천해요."
-            action={{ label: '분석 보기', onClick: () => navigate('/grades') }}
-          />
-        </div>
+        {insight && (
+          <div className="px-5 mt-4">
+            <AIInsightCard
+              title="AI 분석"
+              message={insight.chain[0]}
+              action={{ label: '분석 보기', onClick: () => navigate('/grades') }}
+            />
+          </div>
+        )}
       </div>
       <BottomNav />
     </MobileLayout>

@@ -7,13 +7,16 @@ import { Button } from '../components/ui/Button'
 import { TokenInsufficientSheet } from '../components/features/TokenInsufficientSheet'
 import { useAppStore } from '../hooks/useAppStore'
 import { getExamModes, getExamModeDef } from '../config/examModeConfig'
-import { getCurriculumSubjects, getUnits, getExamAreas, DIFFICULTIES } from '../config/curriculumConfig'
+import { getCurriculumSubjects, getUnits, getExamAreas, DIFFICULTIES, getSubjectTaxonomy, getAreaMockDefaults } from '../config/curriculumConfig'
+import { estimateMinutesForCount } from '../data/examBlueprints/koreanCsat'
 import { generateExamBlueprint } from '../services/aiService'
+import { getExamHistory } from '../services/examService'
 import { recordTransaction } from '../services/tokenService'
 import { saveUser } from '../services/authService'
-import { StudentUser, ExamConfig, ExamMode, ExamBlueprint } from '../types'
+import { StudentUser, ExamConfig, ExamMode, ExamBlueprint, ExamType, Question, QuestionAttempt } from '../types'
 
-type Step = 'mode' | 'subject' | 'semester' | 'unit' | 'settings' | 'preview'
+type Step = 'mode' | 'subject' | 'area_choice' | 'area_major' | 'area_middle' | 'semester' | 'unit' | 'settings' | 'preview'
+type AreaChoice = 'full' | 'area' | 'weakness' | null
 
 interface SubjectOption { id: string; name: string; icon?: string }
 
@@ -38,15 +41,22 @@ export default function ExamBuilder() {
   const [timeLimitMinutes, setTimeLimitMinutes] = useState(40)
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard' | 'mixed'>('mixed')
 
+  // 영역별/AI 취약영역 흐름(섹션 1/24/25)에서만 쓰는 상태
+  const [areaChoice, setAreaChoice] = useState<AreaChoice>(null)
+  const [targetMajorAreaId, setTargetMajorAreaId] = useState('')
+  const [targetMajorAreaName, setTargetMajorAreaName] = useState('')
+
   const [step, setStep] = useState<Step>('mode')
   const [blueprint, setBlueprint] = useState<ExamBlueprint | null>(null)
+  const [previewConfig, setPreviewConfig] = useState<ExamConfig | null>(null)
   const [loadingBlueprint, setLoadingBlueprint] = useState(false)
   const [showTokenSheet, setShowTokenSheet] = useState(false)
 
   const modeDef = examMode ? getExamModeDef(student.schoolLevel, examMode) : undefined
+  const subjectTaxonomy = subjectName ? getSubjectTaxonomy(subjectName) : undefined
+  const selectedMajor = subjectTaxonomy?.find((m) => m.id === targetMajorAreaId)
+  const areaDefaults = targetMajorAreaId ? getAreaMockDefaults(subjectName, targetMajorAreaId) : undefined
 
-  const needsSubject = examMode !== null && examMode !== 'weakness_ai' && examMode !== 'mock_full'
-  const needsUnit = examMode === 'unit_focus' || examMode === 'school_prep'
   const needsSemester = examMode === 'school_prep'
 
   // examMode state 갱신은 비동기이므로, 모드 선택 직후 다음 스텝으로 넘어갈 때는
@@ -111,6 +121,9 @@ export default function ExamBuilder() {
     setSemester(null)
     setUnitId('')
     setUnitName('')
+    setAreaChoice(null)
+    setTargetMajorAreaId('')
+    setTargetMajorAreaName('')
     if (def) {
       setQuestionCount(def.defaultQuestionCount)
       setTimeLimitMinutes(def.defaultTimeLimitMinutes)
@@ -131,12 +144,22 @@ export default function ExamBuilder() {
     if (next) setStep(next)
   }
 
-  async function handleGeneratePreview() {
-    if (!examMode) return
-    const config: ExamConfig = {
+  /** 영역별/AI 취약영역 흐름에서는 steps 배열에 없는 서브스텝을 오가므로 뒤로가기를 직접 처리한다 */
+  function handleBack() {
+    if (step === 'area_major') { setStep('area_choice'); return }
+    if (step === 'area_middle') { setStep('area_major'); return }
+    if (step === 'preview' && areaChoice === 'area') { setStep('area_middle'); return }
+    if (step === 'preview' && (areaChoice === 'full' || areaChoice === 'weakness')) { setStep('area_choice'); return }
+    goStep(-1)
+  }
+
+  function buildConfig(overrides: Partial<ExamConfig> = {}): ExamConfig {
+    const defaultExamType: ExamType = examMode === 'weakness_ai' ? 'WEAKNESS_MOCK' : examMode === 'mock_mini' ? 'MINI_MOCK' : 'PRACTICE'
+    return {
       schoolLevel: student.schoolLevel,
       grade,
-      examMode,
+      examMode: (examMode as ExamMode) ?? 'practice_full',
+      examType: defaultExamType,
       subject: subjectId,
       subjectName: subjectName || modeDef?.label || '전 영역',
       unit: unitId || undefined,
@@ -144,51 +167,80 @@ export default function ExamBuilder() {
       difficulty,
       questionCount,
       timeLimitMinutes,
+      ...overrides,
     }
+  }
+
+  /** weakness_ai 추천에 쓸 실 이력(attempts/questions). majorArea를 주면 그 영역으로 좁힌다. */
+  function loadWeaknessSource(subjectNameArg: string, majorArea?: string): { attempts: QuestionAttempt[]; questions: Question[] } {
+    const history = getExamHistory(student.id).filter((r) => r.config.subjectName === subjectNameArg)
+    let attempts: QuestionAttempt[] = history.flatMap((r) => r.attempts)
+    let questions: Question[] = history.flatMap((r) => r.questions)
+    if (majorArea) {
+      const qMap = new Map(questions.map((q) => [q.questionId, q]))
+      attempts = attempts.filter((a) => qMap.get(a.questionId)?.majorArea === majorArea)
+      questions = questions.filter((q) => q.majorArea === majorArea)
+    }
+    return { attempts, questions }
+  }
+
+  async function runPreview(overrides: Partial<ExamConfig>, weaknessMajorArea?: string) {
+    const config = buildConfig(overrides)
     setLoadingBlueprint(true)
     setStep('preview')
     const topicPool = subjectId ? getUnits(examMode === 'school_prep' ? 'high' : student.schoolLevel, grade, subjectId).map((u) => u.name) : []
-    const bp = await generateExamBlueprint(config, topicPool)
+    const weaknessSource = config.examType === 'WEAKNESS_MOCK' ? loadWeaknessSource(config.subjectName, weaknessMajorArea) : undefined
+    const bp = await generateExamBlueprint(config, topicPool, weaknessSource)
     setBlueprint(bp)
+    setPreviewConfig({ ...config, questionCount: bp.totalQuestions, timeLimitMinutes: bp.estimatedMinutes })
     setLoadingBlueprint(false)
   }
 
+  function chooseMiddleArea(middleName: string | null) {
+    const count = middleName ? areaDefaults?.perMiddleAreaCount ?? 10 : areaDefaults?.fullCount ?? 15
+    setAreaChoice('area')
+    runPreview({
+      examType: 'AREA_MOCK',
+      targetMajorArea: targetMajorAreaName,
+      targetMiddleArea: middleName ?? undefined,
+      questionCount: count,
+      timeLimitMinutes: estimateMinutesForCount(count),
+    })
+  }
+
+  function chooseAreaWeakness() {
+    const count = areaDefaults?.aiWeaknessCount ?? 15
+    setAreaChoice('area')
+    runPreview(
+      { examType: 'WEAKNESS_MOCK', examMode: 'weakness_ai', targetMajorArea: targetMajorAreaName, questionCount: count, timeLimitMinutes: estimateMinutesForCount(count) },
+      targetMajorAreaName
+    )
+  }
+
   function handleConfirm() {
-    if (!examMode || !blueprint) return
+    if (!blueprint || !previewConfig) return
     if (student.tokens < blueprint.tokenCost) {
       setShowTokenSheet(true)
       return
-    }
-    const config: ExamConfig = {
-      schoolLevel: student.schoolLevel,
-      grade,
-      examMode,
-      subject: subjectId,
-      subjectName: subjectName || modeDef?.label || '전 영역',
-      unit: unitId || undefined,
-      unitName: unitName || undefined,
-      difficulty,
-      questionCount,
-      timeLimitMinutes,
     }
     const { balanceAfter } = recordTransaction(student.id, student.tokens, 'SPEND', blueprint.tokenCost, `${blueprint.title} 응시`)
     const updatedUser: StudentUser = { ...student, tokens: balanceAfter }
     saveUser(updatedUser)
     setUser(updatedUser)
 
-    setPendingExamConfig(config)
+    setPendingExamConfig(previewConfig)
     setPendingBlueprint(blueprint)
     navigate('/exam/generating')
   }
 
-  const stepIdx = steps.indexOf(step)
+  const stepIdx = Math.max(0, steps.indexOf(step))
   const progress = ((stepIdx + 1) / steps.length) * 100
 
   return (
     <MobileLayout>
       <PageHeader
         title="새 모의고사 만들기"
-        onBack={stepIdx > 0 ? () => goStep(-1) : undefined}
+        onBack={step !== 'mode' ? handleBack : undefined}
       />
       <div className="px-5 mb-4">
         <div className="h-1 bg-gray-100 rounded-full">
@@ -230,13 +282,102 @@ export default function ExamBuilder() {
               {subjectOptions.map((s) => (
                 <button
                   key={s.id}
-                  onClick={() => { setSubjectId(s.id); setSubjectName(s.name); setUnitId(''); setUnitName(''); goStep(1) }}
+                  onClick={() => {
+                    setSubjectId(s.id); setSubjectName(s.name); setUnitId(''); setUnitName('')
+                    const taxonomy = getSubjectTaxonomy(s.name)
+                    if (examMode === 'mock_subject' && taxonomy) {
+                      setStep('area_choice')
+                    } else {
+                      goStep(1)
+                    }
+                  }}
                   className={`p-3.5 rounded-card border-2 font-semibold text-sm text-left transition-all
                     ${subjectId === s.id ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100 bg-white text-gray-700'}`}
                 >
                   {s.icon && <span className="mr-1">{s.icon}</span>}{s.name}
                 </button>
               ))}
+            </div>
+          </div>
+        )}
+
+        {step === 'area_choice' && (
+          <div>
+            <h2 className="text-lg font-black text-gray-900 mb-1">{subjectName} 모의고사</h2>
+            <p className="text-sm text-gray-500 mb-4">어떤 방식으로 응시할까요?</p>
+            <div className="space-y-2.5">
+              <button
+                onClick={() => { setAreaChoice('full'); setTargetMajorAreaName(''); setTargetMajorAreaId(''); runPreview({ examType: 'FULL_MOCK' }) }}
+                className="w-full text-left p-4 rounded-card border-2 border-gray-100 bg-white hover:border-primary-300 transition-all"
+              >
+                <p className="font-bold text-gray-900 text-sm">전체 모의고사</p>
+                <p className="text-xs text-gray-500 mt-0.5">실제 모의고사와 유사한 전체 구성으로 응시해요</p>
+              </button>
+              <button
+                onClick={() => setStep('area_major')}
+                className="w-full text-left p-4 rounded-card border-2 border-gray-100 bg-white hover:border-primary-300 transition-all"
+              >
+                <p className="font-bold text-gray-900 text-sm">영역별 모의고사</p>
+                <p className="text-xs text-gray-500 mt-0.5">원하는 영역만 실전 스타일로 풀어요</p>
+              </button>
+              <button
+                onClick={() => { setAreaChoice('weakness'); setTargetMajorAreaName(''); setTargetMajorAreaId(''); runPreview({ examType: 'WEAKNESS_MOCK', examMode: 'weakness_ai', questionCount: 15 }) }}
+                className="w-full text-left p-4 rounded-card border-2 border-gray-100 bg-white hover:border-primary-300 transition-all"
+              >
+                <p className="font-bold text-gray-900 text-sm">🤖 AI 취약영역 모의고사</p>
+                <p className="text-xs text-gray-500 mt-0.5">최근 오답을 분석해 취약 영역 비중을 자동으로 높여요</p>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 'area_major' && (
+          <div>
+            <h2 className="text-lg font-black text-gray-900 mb-1">영역 선택</h2>
+            <p className="text-sm text-gray-500 mb-4">어떤 영역을 집중적으로 풀까요?</p>
+            <div className="space-y-2">
+              {(subjectTaxonomy ?? []).map((major) => (
+                <button
+                  key={major.id}
+                  onClick={() => { setTargetMajorAreaId(major.id); setTargetMajorAreaName(major.name); setStep('area_middle') }}
+                  className="w-full text-left p-3.5 rounded-card border-2 border-gray-100 bg-white hover:border-primary-300 font-semibold text-sm text-gray-700 transition-all"
+                >
+                  {major.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {step === 'area_middle' && selectedMajor && (
+          <div>
+            <h2 className="text-lg font-black text-gray-900 mb-1">{selectedMajor.name}</h2>
+            <p className="text-sm text-gray-500 mb-4">전체를 풀거나 세부 영역을 골라보세요</p>
+            <div className="space-y-2">
+              <button
+                onClick={() => chooseMiddleArea(null)}
+                className="w-full flex items-center justify-between p-3.5 rounded-card border-2 border-gray-100 bg-white hover:border-primary-300 transition-all"
+              >
+                <span className="font-bold text-sm text-gray-900">전체 {selectedMajor.name}</span>
+                <span className="text-xs text-gray-400">{areaDefaults?.fullCount ?? 15}문제</span>
+              </button>
+              {selectedMajor.middleAreas.map((mid) => (
+                <button
+                  key={mid.id}
+                  onClick={() => chooseMiddleArea(mid.name)}
+                  className="w-full flex items-center justify-between p-3.5 rounded-card border-2 border-gray-100 bg-white hover:border-primary-300 transition-all"
+                >
+                  <span className="font-semibold text-sm text-gray-700">{mid.name}</span>
+                  <span className="text-xs text-gray-400">{areaDefaults?.perMiddleAreaCount ?? 5}문제</span>
+                </button>
+              ))}
+              <button
+                onClick={chooseAreaWeakness}
+                className="w-full flex items-center justify-between p-3.5 rounded-card border-2 border-primary-200 bg-primary-50 hover:border-primary-400 transition-all"
+              >
+                <span className="font-bold text-sm text-primary-600">🤖 AI 약점 집중</span>
+                <span className="text-xs text-primary-400">{areaDefaults?.aiWeaknessCount ?? 15}문제</span>
+              </button>
             </div>
           </div>
         )}
@@ -319,7 +460,7 @@ export default function ExamBuilder() {
                 ))}
               </div>
             </div>
-            <Button fullWidth size="lg" onClick={handleGeneratePreview}>
+            <Button fullWidth size="lg" onClick={() => runPreview({})}>
               시험 구성 미리보기
             </Button>
           </div>
@@ -340,12 +481,18 @@ export default function ExamBuilder() {
                 <div className="text-center pb-4 border-b border-gray-50">
                   <p className="text-sm text-gray-500">{blueprint.title}</p>
                   <p className="text-3xl font-black text-gray-900 mt-1">총 {blueprint.totalQuestions}문제</p>
+                  {blueprint.rationale && <p className="text-xs text-primary-500 font-semibold mt-2">✨ {blueprint.rationale}</p>}
                 </div>
                 <div className="space-y-2">
                   {blueprint.distribution.map((d) => (
                     <div key={d.label} className="flex items-center justify-between">
                       <span className="text-sm text-gray-700">{d.label}</span>
-                      <span className="text-sm font-bold text-gray-900">{d.count}문제</span>
+                      <div className="text-right">
+                        <span className="text-sm font-bold text-gray-900">{d.count}문제</span>
+                        {d.targetAccuracyBefore !== undefined && d.targetAccuracyAfter !== undefined && (
+                          <p className="text-[11px] text-primary-500">목표 {d.targetAccuracyBefore}% → {d.targetAccuracyAfter}%</p>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
