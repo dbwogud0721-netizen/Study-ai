@@ -1,5 +1,5 @@
 import { MOCK_ACCOUNTS, MOCK_STUDENT, MOCK_PARENT } from '../data/mockUsers'
-import { User, StudentUser, SchoolLevel, Grade, LearningGoal } from '../types'
+import { User, StudentUser, ParentUser, SchoolLevel, Grade, LearningGoal } from '../types'
 import { INITIAL_TOKENS } from '../config/tokenConfig'
 import { CURRENT_CURRICULUM_VERSION, getExamSystemVersion } from '../config/curriculumConfig'
 import { estimateEntryYear } from '../utils/academicYear'
@@ -87,4 +87,58 @@ export function createStudentProfile(input: CreateStudentProfileInput): StudentU
   }
   saveUser(user)
   return user
+}
+
+export interface UpdateLearningSettingsInput {
+  schoolLevel: SchoolLevel
+  grade: Grade
+  selectedSubjects: string[]
+}
+
+// 학습 설정에서 학교급/학년/관심과목을 바꾼다. entryYear·수능체계도 새 학년 기준으로 다시 계산한다.
+export function updateLearningSettings(student: StudentUser, input: UpdateLearningSettingsInput): StudentUser {
+  const entryYear = estimateEntryYear(input.schoolLevel, input.grade)
+  const examSystemVersion = getExamSystemVersion(entryYear).id
+  const updated: StudentUser = {
+    ...student,
+    schoolLevel: input.schoolLevel,
+    grade: input.grade,
+    entryYear,
+    examSystemVersion,
+    selectedSubjects: input.selectedSubjects,
+    interests: input.selectedSubjects,
+  }
+  saveUser(updated)
+  return updated
+}
+
+export function updateProfile(student: StudentUser, input: { name: string }): StudentUser {
+  const updated: StudentUser = { ...student, name: input.name.trim() || student.name }
+  saveUser(updated)
+  return updated
+}
+
+// 보호자 계정(mock)과 상호 연결한다. 학생 쪽엔 parentId를, 보호자 쪽 프로필에는 linkedStudentIds를 갱신한다.
+export function linkParent(student: StudentUser, parentAccountId = 'parent_001'): StudentUser {
+  const parent = (getUserById(parentAccountId) ?? MOCK_PARENT) as ParentUser
+  if (!parent.linkedStudentIds.includes(student.id)) {
+    const updatedParent: ParentUser = { ...parent, linkedStudentIds: [...parent.linkedStudentIds, student.id] }
+    saveUser(updatedParent)
+  }
+  const updated: StudentUser = { ...student, parentId: parentAccountId }
+  saveUser(updated)
+  return updated
+}
+
+export function unlinkParent(student: StudentUser): StudentUser {
+  if (student.parentId) {
+    const parent = getUserById(student.parentId) as ParentUser | null
+    if (parent) {
+      const updatedParent: ParentUser = { ...parent, linkedStudentIds: parent.linkedStudentIds.filter((id) => id !== student.id) }
+      saveUser(updatedParent)
+    }
+  }
+  const updated: StudentUser = { ...student, parentId: undefined }
+  saveUser(updated)
+  return updated
 }
