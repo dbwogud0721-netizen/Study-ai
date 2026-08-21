@@ -134,7 +134,7 @@ export async function generateExam(config: ExamConfig, blueprint?: ExamBlueprint
   const basePool = subjectPool.length > 0 ? subjectPool : MOCK_QUESTIONS
 
   if (!blueprint) {
-    return assignPositions(shuffle(basePool).slice(0, config.questionCount))
+    return finalizeQuestions(shuffle(basePool).slice(0, config.questionCount))
   }
 
   const picked: Question[] = []
@@ -177,15 +177,35 @@ export async function generateExam(config: ExamConfig, blueprint?: ExamBlueprint
     picked.push({ ...src, questionId: `${src.questionId}_dup${dupCount}` })
   }
 
-  return assignPositions(shuffle(picked).slice(0, config.questionCount))
+  return finalizeQuestions(shuffle(picked).slice(0, config.questionCount))
 }
 
 // TEMP(테스트용, 나중에 지울 것): 토큰 보상 흐름을 빠르게 확인할 수 있도록
 // 생성되는 모든 문제의 정답을 1번(인덱스 0)으로 강제한다.
 const DEBUG_FORCE_FIRST_CHOICE_CORRECT = true
 
-function assignPositions(questions: Question[]): Question[] {
-  return questions.map((q, i) => ({
+// 실제 수능/모의고사와 동일하게 5지선다로 통일한다. 원본 문제가 4개뿐이면
+// 같은 과목의 다른 문제에서 오답 하나를 빌려와 5번째 선택지로 채운다.
+function ensureFiveChoices(questions: Question[]): Question[] {
+  return questions.map((q) => {
+    if (q.choices.length >= 5) return q
+    const existing = new Set(q.choices)
+    const candidates = shuffle(MOCK_QUESTIONS.filter((other) => other.subject === q.subject && other.questionId !== q.questionId))
+
+    let extra: string | undefined
+    for (const other of candidates) {
+      const wrongChoices = other.choices.filter((_, i) => i !== other.correctAnswer)
+      const found = wrongChoices.find((c) => !existing.has(c))
+      if (found) { extra = found; break }
+    }
+    if (!extra) extra = `${q.choices[q.choices.length - 1]} (유사 오답)`
+
+    return { ...q, choices: [...q.choices, extra] }
+  })
+}
+
+function finalizeQuestions(questions: Question[]): Question[] {
+  return ensureFiveChoices(questions).map((q, i) => ({
     ...q,
     questionPosition: i + 1,
     correctAnswer: DEBUG_FORCE_FIRST_CHOICE_CORRECT ? 0 : q.correctAnswer,
