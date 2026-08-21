@@ -11,9 +11,9 @@ export const TOKEN_COSTS: Record<string, number> = {
 }
 
 export const TOKEN_REWARDS = {
-  score_90_plus: 5,
-  score_80_89: 3,
-  score_70_79: 2,
+  score_90_plus: 10,
+  score_80_89: 5,
+  score_70_79: 1,
   score_below_70: 1,
   streak_7day: 2,
   streak_30day: 5,
