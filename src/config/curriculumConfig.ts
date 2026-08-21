@@ -43,6 +43,26 @@ export function getAreaMockDefaults(subjectName: string, majorAreaId: string) {
   return undefined
 }
 
+export interface OfficialMockSpec {
+  questionCount: number
+  timeLimitMinutes: number
+}
+
+/** 실제 수능/모의고사(3·6·9월 학평·모평) 과목별 고정 문항수·시간. "모의고사"는 슬라이더로
+ * 고를 값이 아니라 실제 시험과 동일한 값이어야 하므로, 모의고사 계열 모드는 이 값을 그대로 쓴다. */
+const OFFICIAL_MOCK_SPEC: Record<string, OfficialMockSpec> = {
+  국어: { questionCount: 45, timeLimitMinutes: 80 },
+  수학: { questionCount: 30, timeLimitMinutes: 100 },
+  영어: { questionCount: 45, timeLimitMinutes: 70 },
+  한국사: { questionCount: 20, timeLimitMinutes: 30 },
+}
+
+export function getOfficialMockSpec(subjectName: string): OfficialMockSpec {
+  if (OFFICIAL_MOCK_SPEC[subjectName]) return OFFICIAL_MOCK_SPEC[subjectName]
+  if (subjectName.startsWith('탐구')) return { questionCount: 20, timeLimitMinutes: 30 }
+  return { questionCount: 20, timeLimitMinutes: 40 }
+}
+
 export const CURRENT_CURRICULUM_VERSION = '2022개정'
 
 export function getCurriculumSubjects(schoolLevel: SchoolLevel, grade: number): CurriculumSubject[] {

@@ -7,7 +7,7 @@ import { Button } from '../components/ui/Button'
 import { TokenInsufficientSheet } from '../components/features/TokenInsufficientSheet'
 import { useAppStore } from '../hooks/useAppStore'
 import { getExamModes, getExamModeDef } from '../config/examModeConfig'
-import { getCurriculumSubjects, getUnits, getExamAreas, DIFFICULTIES, getSubjectTaxonomy, getAreaMockDefaults } from '../config/curriculumConfig'
+import { getCurriculumSubjects, getUnits, getExamAreas, DIFFICULTIES, getSubjectTaxonomy, getAreaMockDefaults, getOfficialMockSpec } from '../config/curriculumConfig'
 import { estimateMinutesForCount } from '../data/examBlueprints/koreanCsat'
 import { generateExamBlueprint } from '../services/aiService'
 import { getExamHistory } from '../services/examService'
@@ -65,10 +65,13 @@ export default function ExamBuilder() {
   // state가 아니라 방금 고른 mode 값으로 직접 스텝 순서를 계산해야 한다.
   function stepsForMode(mode: ExamMode): Step[] {
     const s: Step[] = ['mode']
-    if (mode !== 'weakness_ai' && mode !== 'mock_full') s.push('subject')
+    if (mode !== 'weakness_ai') s.push('subject')
     if (mode === 'school_prep') s.push('semester')
     if (mode === 'unit_focus' || mode === 'school_prep') s.push('unit')
-    s.push('settings', 'preview')
+    // 모의고사 계열(mock_full/mock_subject)은 실제 시험과 동일한 문항수·시간이 고정값이라
+    // 문제 수를 고르는 settings 스텝 자체를 건너뛴다.
+    if (mode !== 'mock_full' && mode !== 'mock_subject') s.push('settings')
+    s.push('preview')
     return s
   }
 
@@ -291,6 +294,17 @@ export default function ExamBuilder() {
                     const taxonomy = getSubjectTaxonomy(s.name)
                     if (examMode === 'mock_subject' && taxonomy) {
                       setStep('area_choice')
+                    } else if (examMode === 'mock_full' || examMode === 'mock_subject') {
+                      // 모의고사: 실제 시험과 동일한 고정 문항수·시간으로 바로 미리보기 생성(임의 선택 불가)
+                      const spec = getOfficialMockSpec(s.name)
+                      runPreview({
+                        subject: s.id,
+                        subjectName: s.name,
+                        examType: 'FULL_MOCK',
+                        questionCount: spec.questionCount,
+                        timeLimitMinutes: spec.timeLimitMinutes,
+                        difficulty: 'mixed',
+                      })
                     } else {
                       goStep(1)
                     }
@@ -311,7 +325,11 @@ export default function ExamBuilder() {
             <p className="text-sm text-gray-500 mb-4">어떤 방식으로 응시할까요?</p>
             <div className="space-y-2.5">
               <button
-                onClick={() => { setAreaChoice('full'); setTargetMajorAreaName(''); setTargetMajorAreaId(''); runPreview({ examType: 'FULL_MOCK' }) }}
+                onClick={() => {
+                  setAreaChoice('full'); setTargetMajorAreaName(''); setTargetMajorAreaId('')
+                  const spec = getOfficialMockSpec(subjectName)
+                  runPreview({ examType: 'FULL_MOCK', questionCount: spec.questionCount, timeLimitMinutes: spec.timeLimitMinutes, difficulty: 'mixed' })
+                }}
                 className="w-full text-left p-4 rounded-card border-2 border-gray-100 bg-white hover:border-primary-300 transition-all"
               >
                 <p className="font-bold text-gray-900 text-sm">전체 모의고사</p>

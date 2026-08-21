@@ -71,18 +71,20 @@ export async function generateExamBlueprint(
     return generateRecommendedExamFromHistory(weaknessSource.attempts, weaknessSource.questions, config.subjectName, config.questionCount)
   }
 
-  // 전체 모의고사: 과목별 고정 구성(예: 국어 독서17/문학17/언어와매체11)
+  // 전체 모의고사: 실제 수능과 동일한 문항수·시간이 고정값이다(임의 선택 불가).
+  // 과목별 세부 영역 구성이 등록돼 있으면 그걸 쓰고, 없으면 문항수/시간만 고정한 채 균등 배분한다.
   if (config.examType === 'FULL_MOCK') {
     const full = getFullMockBlueprint(config.subjectName)
-    if (full) {
-      return {
-        title: `${config.subjectName} 전체 모의고사`,
-        examModeLabel: modeDef?.label ?? '전체 모의고사',
-        totalQuestions: full.totalQuestions,
-        distribution: full.distribution,
-        estimatedMinutes: full.timeLimitMinutes,
-        tokenCost,
-      }
+    const totalQuestions = full?.totalQuestions ?? config.questionCount
+    const estimatedMinutes = full?.timeLimitMinutes ?? config.timeLimitMinutes
+    return {
+      title: `${config.subjectName} 전체 모의고사`,
+      examModeLabel: modeDef?.label ?? '전체 모의고사',
+      totalQuestions,
+      distribution: full?.distribution ?? buildBalancedDistribution(topicPool, totalQuestions),
+      estimatedMinutes,
+      tokenCost,
+      rationale: '실제 수능과 동일한 문항수·시간으로 구성했어요',
     }
   }
 
