@@ -8,7 +8,7 @@ import { Button } from '../components/ui/Button'
 import { BottomSheet } from '../components/ui/BottomSheet'
 import { TokenProductCard } from '../components/features/TokenProductCard'
 import { useAppStore } from '../hooks/useAppStore'
-import { TOKEN_PACKAGES, TOKEN_REWARDS } from '../config/tokenConfig'
+import { TOKEN_PACKAGES, TOKEN_REWARDS, TOKEN_COSTS } from '../config/tokenConfig'
 import { getExamModes } from '../config/examModeConfig'
 import { getWallet, getMonthlyStats, getTransactions, recordTransaction } from '../services/tokenService'
 import { requestTokenPurchase } from '../services/paymentService'
@@ -84,6 +84,7 @@ export default function TokenPage() {
                 <div key={m.id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
                   <span className="text-lg">{m.icon}</span>
                   <span className="flex-1 text-sm text-gray-700">{m.label}</span>
+                  <span className="font-bold text-amber-500">🪙 {TOKEN_COSTS[m.id] ?? 0}</span>
                 </div>
               ))}
             </div>
