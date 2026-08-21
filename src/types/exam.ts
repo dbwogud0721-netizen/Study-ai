@@ -31,6 +31,8 @@ export interface ExamConfig {
   difficulty: 'easy' | 'medium' | 'hard' | 'mixed'
   questionCount: number
   timeLimitMinutes: number
+  /** 학생이 직접 설정하는 목표 점수. 실제 점수가 이보다 높으면 토큰 보너스가 지급된다. */
+  targetScore?: number
 }
 
 export interface BlueprintItem {
@@ -72,6 +74,10 @@ export interface ExamResult {
   previousScore?: number
   scoreDelta?: number
   flaggedQuestionIds?: string[]
+  /** 목표 점수 달성 보너스 (섹션: 목표점수 초과 시 ₩5,000 상당 토큰 지급) */
+  targetScore?: number
+  targetScoreMet?: boolean
+  targetScoreBonusTokens?: number
 }
 
 export interface ConceptAnalysis {

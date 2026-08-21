@@ -13,6 +13,7 @@ import { generateExamBlueprint } from '../services/aiService'
 import { getExamHistory } from '../services/examService'
 import { recordTransaction } from '../services/tokenService'
 import { saveUser } from '../services/authService'
+import { TARGET_SCORE_BONUS } from '../config/tokenConfig'
 import { StudentUser, ExamConfig, ExamMode, ExamBlueprint, ExamType, Question, QuestionAttempt } from '../types'
 
 type Step = 'mode' | 'subject' | 'area_choice' | 'area_major' | 'area_middle' | 'semester' | 'unit' | 'settings' | 'preview'
@@ -40,6 +41,7 @@ export default function ExamBuilder() {
   const [questionCount, setQuestionCount] = useState(20)
   const [timeLimitMinutes, setTimeLimitMinutes] = useState(40)
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard' | 'mixed'>('mixed')
+  const [targetScore, setTargetScore] = useState<number | undefined>(undefined)
 
   // 영역별/AI 취약영역 흐름(섹션 1/24/25)에서만 쓰는 상태
   const [areaChoice, setAreaChoice] = useState<AreaChoice>(null)
@@ -107,10 +109,10 @@ export default function ExamBuilder() {
   }, [subjectId, examMode, student.schoolLevel, grade, needsSemester, semester])
 
   const countPresets = useMemo(() => {
-    if (!modeDef) return [10, 20, 30]
+    if (!modeDef) return [5, 10, 20, 30]
     if (modeDef.defaultQuestionCount <= 10) return [5, 10, 15]
-    if (modeDef.defaultQuestionCount >= 30) return [20, 30, 40]
-    return [10, 20, 30]
+    if (modeDef.defaultQuestionCount >= 30) return [5, 20, 30, 40]
+    return [5, 10, 20, 30]
   }, [modeDef])
 
   function applyMode(m: ExamMode) {
@@ -124,6 +126,7 @@ export default function ExamBuilder() {
     setAreaChoice(null)
     setTargetMajorAreaId('')
     setTargetMajorAreaName('')
+    setTargetScore(undefined)
     if (def) {
       setQuestionCount(def.defaultQuestionCount)
       setTimeLimitMinutes(def.defaultTimeLimitMinutes)
@@ -167,6 +170,7 @@ export default function ExamBuilder() {
       difficulty,
       questionCount,
       timeLimitMinutes,
+      targetScore,
       ...overrides,
     }
   }
@@ -425,7 +429,7 @@ export default function ExamBuilder() {
           <div className="space-y-6">
             <div>
               <h2 className="text-lg font-black text-gray-900 mb-3">문제 수</h2>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 {countPresets.map((c) => (
                   <button
                     key={c}
@@ -458,6 +462,29 @@ export default function ExamBuilder() {
                     <span className={d.color}>{d.label}</span>
                   </button>
                 ))}
+              </div>
+            </div>
+            <div>
+              <h2 className="text-lg font-black text-gray-900 mb-1">목표 점수 (선택)</h2>
+              <p className="text-xs text-gray-500 mb-3">목표보다 높은 점수를 받으면 보너스 🪙 {TARGET_SCORE_BONUS.tokens} TOKEN (₩{TARGET_SCORE_BONUS.won.toLocaleString()} 상당)을 드려요</p>
+              <div className="grid grid-cols-4 gap-2">
+                {[70, 80, 90].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setTargetScore(targetScore === s ? undefined : s)}
+                    className={`py-3 rounded-card border-2 font-bold text-sm transition-all
+                      ${targetScore === s ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100 bg-white text-gray-700'}`}
+                  >
+                    {s}점
+                  </button>
+                ))}
+                <button
+                  onClick={() => setTargetScore(undefined)}
+                  className={`py-3 rounded-card border-2 font-bold text-sm transition-all
+                    ${targetScore === undefined ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100 bg-white text-gray-400'}`}
+                >
+                  안 함
+                </button>
               </div>
             </div>
             <Button fullWidth size="lg" onClick={() => runPreview({})}>
@@ -504,6 +531,13 @@ export default function ExamBuilder() {
                   <span className="text-sm text-gray-500">사용 토큰</span>
                   <span className="font-black text-amber-500">🪙 {blueprint.tokenCost} TOKEN</span>
                 </div>
+                {previewConfig?.targetScore !== undefined && (
+                  <div className="pt-4 border-t border-gray-50 bg-amber-50 -mx-5 -mb-5 px-5 py-3 rounded-b-card">
+                    <p className="text-xs font-semibold text-amber-700">
+                      🎯 목표 점수 {previewConfig.targetScore}점 초과 달성 시 보너스 🪙 {TARGET_SCORE_BONUS.tokens} TOKEN (₩{TARGET_SCORE_BONUS.won.toLocaleString()} 상당)
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>

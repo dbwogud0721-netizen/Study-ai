@@ -10,6 +10,7 @@ import { useExamTimer, formatTime } from '../hooks/useExamTimer'
 import { buildExamResult } from '../services/examService'
 import { recordTransaction } from '../services/tokenService'
 import { saveUser } from '../services/authService'
+import { TARGET_SCORE_BONUS } from '../config/tokenConfig'
 import { StudentUser, QuestionAttempt } from '../types'
 
 interface AttemptTrack {
@@ -110,8 +111,19 @@ export default function Exam() {
 
     const result = await buildExamResult(config, questions, answers, student.id, duration, flaggedIds, attempts)
 
-    const { balanceAfter } = recordTransaction(student.id, student.tokens, 'EARN', result.tokensEarned, `${config.subjectName} 시험 ${result.score}점 보상`)
-    const updatedUser: StudentUser = { ...student, tokens: balanceAfter }
+    const { balanceAfter: afterEarn } = recordTransaction(student.id, student.tokens, 'EARN', result.tokensEarned, `${config.subjectName} 시험 ${result.score}점 보상`)
+    let finalBalance = afterEarn
+    if (result.targetScoreMet && result.targetScoreBonusTokens) {
+      const { balanceAfter: afterBonus } = recordTransaction(
+        student.id,
+        afterEarn,
+        'BONUS',
+        result.targetScoreBonusTokens,
+        `목표 점수 ${result.targetScore}점 초과 달성 보너스 (₩${TARGET_SCORE_BONUS.won.toLocaleString()} 상당)`
+      )
+      finalBalance = afterBonus
+    }
+    const updatedUser: StudentUser = { ...student, tokens: finalBalance }
     setUser(updatedUser)
     saveUser(updatedUser)
     setCurrentExamResult(result)

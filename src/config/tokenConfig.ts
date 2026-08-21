@@ -22,6 +22,10 @@ export const TOKEN_REWARDS = {
 
 export const FREE_DAILY_QUESTIONS = 5
 
+// 목표 점수 초과 달성 보너스. 토큰 수는 가장 저렴한 패키지(pkg_10 = 1,000원/10토큰) 기준
+// 환산가로 산정한다: 5,000원 ÷ 100원/토큰 = 50 TOKEN.
+export const TARGET_SCORE_BONUS = { won: 5000, tokens: 50 } as const
+
 export const TOKEN_PACKAGES = [
   { id: 'pkg_10', tokens: 10, price: 1000, label: '10 토큰', bonus: 0, best: false },
   { id: 'pkg_30', tokens: 30, price: 2700, label: '30 토큰', bonus: 3, best: true },
