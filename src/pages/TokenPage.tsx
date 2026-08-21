@@ -84,7 +84,7 @@ export default function TokenPage() {
                 <div key={m.id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
                   <span className="text-lg">{m.icon}</span>
                   <span className="flex-1 text-sm text-gray-700">{m.label}</span>
-                  <span className="font-bold text-amber-500">🪙 {TOKEN_COSTS[m.id] ?? 0}</span>
+                  <span className="font-bold text-red-400">-{TOKEN_COSTS[m.id] ?? 0} 🪙</span>
                 </div>
               ))}
             </div>
