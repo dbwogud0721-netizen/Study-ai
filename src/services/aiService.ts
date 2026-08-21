@@ -180,8 +180,16 @@ export async function generateExam(config: ExamConfig, blueprint?: ExamBlueprint
   return assignPositions(shuffle(picked).slice(0, config.questionCount))
 }
 
+// TEMP(테스트용, 나중에 지울 것): 토큰 보상 흐름을 빠르게 확인할 수 있도록
+// 생성되는 모든 문제의 정답을 1번(인덱스 0)으로 강제한다.
+const DEBUG_FORCE_FIRST_CHOICE_CORRECT = true
+
 function assignPositions(questions: Question[]): Question[] {
-  return questions.map((q, i) => ({ ...q, questionPosition: i + 1 }))
+  return questions.map((q, i) => ({
+    ...q,
+    questionPosition: i + 1,
+    correctAnswer: DEBUG_FORCE_FIRST_CHOICE_CORRECT ? 0 : q.correctAnswer,
+  }))
 }
 
 function shuffle<T>(arr: T[]): T[] {
