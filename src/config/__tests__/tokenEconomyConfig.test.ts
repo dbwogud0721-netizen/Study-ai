@@ -47,19 +47,19 @@ describe('getMaxConvertibleTokens', () => {
   })
 })
 
-describe('deriveWallet + getMaxConvertibleTokens (지갑 구성)', () => {
-  it('22 Purchased + 50 Reward -> 총 Token 72, 현금 전환 가능 Token 50', () => {
+describe('deriveWallet + getMaxConvertibleTokens (지갑 구성, 구매+리워드 합산 전환)', () => {
+  it('22 Purchased + 50 Reward -> 총 Token 72, 현금 전환 가능 Token 70', () => {
     const wallet = deriveWallet([tx('PURCHASED', 22), tx('REWARD', 50)])
     expect(wallet.balance).toBe(72)
     expect(wallet.purchasedBalance).toBe(22)
     expect(wallet.rewardBalance).toBe(50)
-    expect(getMaxConvertibleTokens(wallet.rewardBalance)).toBe(50)
+    expect(getMaxConvertibleTokens(wallet.balance)).toBe(70)
   })
 
-  it('Purchased Token만 50 -> 현금 전환 가능 Token 0', () => {
+  it('Purchased Token만 50 -> 현금 전환 가능 Token 50 (구매 Token도 전환 대상)', () => {
     const wallet = deriveWallet([tx('PURCHASED', 50)])
     expect(wallet.rewardBalance).toBe(0)
-    expect(getMaxConvertibleTokens(wallet.rewardBalance)).toBe(0)
+    expect(getMaxConvertibleTokens(wallet.balance)).toBe(50)
   })
 })
 

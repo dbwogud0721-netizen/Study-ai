@@ -1,6 +1,7 @@
 import { Question, QuestionAttempt, ExamBlueprint, BlueprintItem } from '../../types'
 import { calculateAreaAccuracy } from './calculateAreaAccuracy'
 import { calculateConceptAccuracy } from './calculateConceptAccuracy'
+import { EXAM_TOKEN_COST } from '../../config/tokenConfig'
 
 /**
  * 취약 중영역들의 정답률이 낮을수록 문항 배분을 늘린다(섹션 16). weakness_ai 모드에서 사용.
@@ -40,7 +41,7 @@ export function generateRecommendedExam(
     totalQuestions,
     distribution,
     estimatedMinutes: Math.max(15, Math.round(totalQuestions * 1.8)),
-    tokenCost: 3,
+    tokenCost: EXAM_TOKEN_COST,
     rationale: '최근 오답을 분석하여 구성했어요.',
   }
 }

@@ -9,7 +9,7 @@ import { useAppStore } from '../hooks/useAppStore'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { CORE_SUBJECTS, getCoreSubjectUnits } from '../config/curriculumConfig'
 import { UNIFIED_EXAM_TYPES, mapUnifiedExamType, UnifiedExamType } from '../config/examModeConfig'
-import { calculateExamTokenCost } from '../config/tokenConfig'
+import { EXAM_TOKEN_COST } from '../config/tokenConfig'
 import { spendForExam } from '../services/tokenService'
 import { saveUser } from '../services/authService'
 import { StudentUser, ExamConfig, ExamType } from '../types'
@@ -60,7 +60,7 @@ export default function ExamBuilder() {
   }
 
   const selectedUnit = unitOptions.find((u) => u.id === unitId) ?? unitOptions[0]
-  const tokenCost = calculateExamTokenCost(questionCount, examTypeId === 'weakness_ai')
+  const tokenCost = EXAM_TOKEN_COST
 
   const config: ExamConfig = useMemo(() => {
     const examMode = mapUnifiedExamType(student.schoolLevel, examTypeId)

@@ -15,8 +15,7 @@ import { TOKEN_REWARDS } from '../config/tokenConfig'
 import { StudentUser } from '../types'
 
 const TOKEN_RULE_ROWS = [
-  { label: '100점', reward: TOKEN_REWARDS.score_100 },
-  { label: '90~99점', reward: TOKEN_REWARDS.score_90_99 },
+  { label: '90점 이상', reward: TOKEN_REWARDS.score_90_plus },
   { label: '80~89점', reward: TOKEN_REWARDS.score_80_89 },
   { label: '60~79점', reward: TOKEN_REWARDS.score_60_79 },
   { label: '60점 미만', reward: TOKEN_REWARDS.score_below_60 },

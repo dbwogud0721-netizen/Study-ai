@@ -28,9 +28,9 @@ export default function ExamResult() {
       : null
 
   const wallet = getWallet(student.id)
-  const remainder = wallet.rewardBalance % CASH_CONVERSION_UNIT
+  const remainder = wallet.balance % CASH_CONVERSION_UNIT
   const tokensNeeded = remainder === 0 ? 0 : CASH_CONVERSION_UNIT - remainder
-  const nextMilestone = wallet.rewardBalance + tokensNeeded
+  const nextMilestone = wallet.balance + tokensNeeded
 
   return (
     <MobileLayout className="bg-gray-50">
@@ -59,7 +59,7 @@ export default function ExamResult() {
                 <span className="text-sm font-black text-amber-500">+{r.targetScoreBonusTokens} TOKEN</span>
               </div>
             ) : null}
-            <p className="text-xs text-gray-400 mt-3 pt-3 border-t border-gray-50">현재 Reward Token {wallet.rewardBalance}</p>
+            <p className="text-xs text-gray-400 mt-3 pt-3 border-t border-gray-50">현재 보유 Token {wallet.balance}</p>
           </div>
 
           <div className="bg-white rounded-card p-4 flex items-center gap-3">
@@ -71,7 +71,7 @@ export default function ExamResult() {
                 </>
               ) : (
                 <>
-                  <strong>{wallet.rewardBalance} TOKEN</strong> 지금 바로 현금 전환 가능해요!
+                  <strong>{wallet.balance} TOKEN</strong> 지금 바로 현금 전환 가능해요!
                 </>
               )}
             </p>

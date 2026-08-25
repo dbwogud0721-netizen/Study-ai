@@ -25,7 +25,7 @@ export function computeConversion(tokenAmount: number): ConversionBreakdown {
   return { grossAmount, feeAmount, netAmount: grossAmount - feeAmount }
 }
 
-/** Reward Token 잔액에서 10개 단위로 전환 가능한 최대치(내림). */
-export function getMaxConvertibleTokens(rewardBalance: number): number {
-  return Math.floor(rewardBalance / CASH_CONVERSION_UNIT) * CASH_CONVERSION_UNIT
+/** 보유 Token(구매+리워드 합산) 중 10개 단위로 전환 가능한 최대치(내림). */
+export function getMaxConvertibleTokens(balance: number): number {
+  return Math.floor(balance / CASH_CONVERSION_UNIT) * CASH_CONVERSION_UNIT
 }

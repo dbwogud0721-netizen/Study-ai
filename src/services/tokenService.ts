@@ -88,9 +88,16 @@ export function spendForExam(userId: string, amount: number, reason: string): To
   return getWallet(userId)
 }
 
-/** 현금 전환. REWARD_TOKEN만 대상이며, 지급 Provider 성공을 확인한 뒤에만 호출해야 한다. */
-export function convertRewardToCash(userId: string, tokenAmount: number, reason: string): TokenWallet {
-  appendTransaction(userId, 'CONVERT', 'REWARD', tokenAmount, reason)
+/**
+ * 현금 전환. 보유 Token(구매+리워드) 전체가 대상이다 — 구매 Token도 수수료를 뗀
+ * 환불처럼 전환할 수 있다. PURCHASED를 먼저 소진하고 부족분만 REWARD를 쓴다
+ * (시험 응시 소비와 동일한 우선순위). 지급 Provider 성공을 확인한 뒤에만 호출해야 한다.
+ */
+export function convertTokensToCash(userId: string, tokenAmount: number, reason: string): TokenWallet {
+  const wallet = getWallet(userId)
+  const { fromPurchased, fromReward } = splitSpendAcrossSources(wallet.purchasedBalance, wallet.rewardBalance, tokenAmount)
+  if (fromPurchased > 0) appendTransaction(userId, 'CONVERT', 'PURCHASED', fromPurchased, reason)
+  if (fromReward > 0) appendTransaction(userId, 'CONVERT', 'REWARD', fromReward, reason)
   return getWallet(userId)
 }
 
@@ -105,8 +112,7 @@ export function getMonthlyStats(userId: string, now: Date = new Date()): { earne
 }
 
 export function calculateReward(score: number): number {
-  if (score >= 100) return TOKEN_REWARDS.score_100
-  if (score >= 90) return TOKEN_REWARDS.score_90_99
+  if (score >= 90) return TOKEN_REWARDS.score_90_plus
   if (score >= 80) return TOKEN_REWARDS.score_80_89
   if (score >= 60) return TOKEN_REWARDS.score_60_79
   return TOKEN_REWARDS.score_below_60
