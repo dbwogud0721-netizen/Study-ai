@@ -1,6 +1,6 @@
 import { ExamResult, ExamConfig, Question, QuestionAttempt, ConceptAnalysis, Difficulty } from '../types'
 import { KOREAN_QUESTION_BANK } from './generated/koreanQuestionBank'
-import { calculateReward } from '../services/tokenService'
+import { calculateScoreReward } from '../config/tokenConfig'
 
 /**
  * 검수용 "Student A" 시나리오(섹션 29): 국어 문학 취약, 고전시가 ~38%, 보기 적용 ~43%,
@@ -202,8 +202,8 @@ function buildOneExam(userId: string, examIndex: number, daysAgo: number): ExamR
     score,
     correctCount,
     wrongCount: attempts.length - correctCount,
-    tokensEarned: calculateReward(score),
-    tokensSpent: 3,
+    tokensEarned: calculateScoreReward(score),
+    tokensSpent: 0,
     completedAt: new Date(Date.now() - daysAgo * 86400000).toISOString(),
     duration,
     conceptAnalysis,

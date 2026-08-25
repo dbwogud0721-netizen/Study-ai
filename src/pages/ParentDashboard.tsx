@@ -1,6 +1,5 @@
-import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CheckCircle, XCircle, LogOut, BookOpen, TrendingUp, Clock } from 'lucide-react'
+import { LogOut, BookOpen, TrendingUp, Target, CreditCard } from 'lucide-react'
 import { MobileLayout } from '../components/layout/MobileLayout'
 import { Button } from '../components/ui/Button'
 import { ProgressBar } from '../components/ui/ProgressBar'
@@ -8,11 +7,9 @@ import { ScoreChart } from '../components/ui/ScoreChart'
 import { ExamHistoryItem } from '../components/features/ExamHistoryItem'
 import { useAppStore } from '../hooks/useAppStore'
 import { logout } from '../services/authService'
-import { getMonthlyStats } from '../services/tokenService'
 import { getExamHistory } from '../services/examService'
 import { calculateAreaAccuracy } from '../services/analytics'
-import { getPendingRequestsForParent, approveRequest, rejectRequest } from '../services/paymentService'
-import { TOKEN_PACKAGES } from '../config/tokenEconomyConfig'
+import { getActiveRewardPool, getSubscriptionPayments } from '../services/tokenService'
 import { MOCK_STUDENT } from '../data/mockUsers'
 import { formatDuration, scoreColor } from '../utils/formatters'
 import { ParentUser } from '../types'
@@ -22,7 +19,6 @@ export default function ParentDashboard() {
   const { user, setUser } = useAppStore()
   const parent = user as ParentUser
   const student = MOCK_STUDENT
-  const [refreshKey, setRefreshKey] = useState(0)
 
   const history = getExamHistory(student.id)
   const weeklyStudy = history.filter((h) => {
@@ -38,27 +34,23 @@ export default function ParentDashboard() {
   const areaAcc = calculateAreaAccuracy(history.flatMap((r) => r.attempts), history.flatMap((r) => r.questions))
   const strong = [...areaAcc].reverse().filter((a) => a.accuracy >= 70).slice(0, 2)
   const weak = areaAcc.slice(0, 2)
-  const monthlyTokenUsage = getMonthlyStats(student.id).spent
 
-  const pendingRequests = useMemo(
-    () => getPendingRequestsForParent(parent?.linkedStudentIds ?? []),
-    [parent, refreshKey]
-  )
+  const now = new Date()
+  const monthlyHistory = history.filter((h) => {
+    const d = new Date(h.completedAt)
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+  })
+  const monthlyAvg = monthlyHistory.length ? Math.round(monthlyHistory.reduce((s, h) => s + h.score, 0) / monthlyHistory.length) : 0
+  const monthlyGoalHits = monthlyHistory.filter((h) => h.targetScoreMet).length
+
+  const pool = getActiveRewardPool(student.id)
+  const payment = pool ? getSubscriptionPayments(student.id).find((p) => p.id === pool.paymentId) : undefined
+  const poolPercent = pool && pool.totalPoolKrw > 0 ? Math.min(100, Math.round((pool.earnedKrw / pool.totalPoolKrw) * 100)) : 0
 
   const handleLogout = () => {
     logout()
     setUser(null)
     navigate('/login')
-  }
-
-  const handleReject = (id: string) => {
-    rejectRequest(id)
-    setRefreshKey((k) => k + 1)
-  }
-
-  const handleApprove = (id: string) => {
-    approveRequest(id)
-    navigate(`/parent/payment/${id}`)
   }
 
   return (
@@ -101,6 +93,68 @@ export default function ParentDashboard() {
               <div>
                 <p className="text-xl font-black">{formatDuration(totalDuration)}</p>
                 <p className="text-[11px] opacity-80 mt-1">학습시간</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-5 mt-4">
+          <div className="bg-white rounded-card p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <CreditCard size={18} className="text-primary-500" />
+              <h3 className="font-bold text-gray-900">이번 달 학습 프로그램</h3>
+            </div>
+            {pool && payment ? (
+              <>
+                <div className="flex items-baseline justify-between mb-3">
+                  <span className="text-sm text-gray-500">결제</span>
+                  <span className="text-xl font-black text-gray-900">₩{payment.totalPaymentKrw.toLocaleString()}</span>
+                </div>
+                <div className="bg-gray-50 rounded-2xl p-3 space-y-1.5 mb-4">
+                  <Row label="AI 학습 서비스 이용료" value={`₩${payment.serviceFeeKrw.toLocaleString()}`} />
+                  <Row label="학생 Reward 예산" value={`₩${payment.rewardPoolKrw.toLocaleString()}`} />
+                </div>
+                <div className="pt-3 border-t border-gray-50">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-bold text-gray-900">이번 달 {student.name}이의 Reward</span>
+                    <span className="text-xs text-gray-400">{poolPercent}%</span>
+                  </div>
+                  <ProgressBar value={poolPercent} color="bg-amber-400" height="h-2.5" />
+                  <div className="flex items-center justify-between mt-2 text-sm">
+                    <span className="text-green-600 font-bold">획득 ₩{pool.earnedKrw.toLocaleString()}</span>
+                    <span className="text-gray-400">남은 Reward ₩{pool.remainingKrw.toLocaleString()}</span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-sm text-gray-500 mb-4">이번 달 학습 프로그램 결제가 아직 없어요</p>
+                <Button fullWidth onClick={() => navigate('/parent/payment')}>
+                  이번 달 결제하기
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="px-5 mt-4">
+          <div className="bg-white rounded-card p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Target size={18} className="text-primary-500" />
+              <h3 className="font-bold text-gray-900">학습 결과</h3>
+            </div>
+            <div className="grid grid-cols-3 divide-x divide-gray-100 text-center">
+              <div>
+                <p className="text-xl font-black text-gray-900">{monthlyHistory.length}회</p>
+                <p className="text-[11px] text-gray-400 mt-1">시험</p>
+              </div>
+              <div>
+                <p className="text-xl font-black text-gray-900">{monthlyGoalHits}회</p>
+                <p className="text-[11px] text-gray-400 mt-1">목표 점수 달성</p>
+              </div>
+              <div>
+                <p className="text-xl font-black text-gray-900">{monthlyAvg}점</p>
+                <p className="text-[11px] text-gray-400 mt-1">평균점수</p>
               </div>
             </div>
           </div>
@@ -175,51 +229,6 @@ export default function ParentDashboard() {
         </div>
 
         <div className="px-5 mt-4">
-          <div className="bg-white rounded-card p-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Clock size={18} className="text-primary-500" />
-              <h3 className="font-bold text-gray-900">이번 달 토큰 사용</h3>
-            </div>
-            <span className="font-black text-amber-500">🪙 {monthlyTokenUsage} TOKEN</span>
-          </div>
-        </div>
-
-        {pendingRequests.length > 0 && (
-          <div className="px-5 mt-4">
-            <div className="bg-white rounded-card p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="text-lg">🪙</span>
-                <h3 className="font-bold text-gray-900">결제 요청</h3>
-                <span className="ml-auto bg-red-100 text-red-500 text-xs font-bold px-2 py-0.5 rounded-full">{pendingRequests.length}건</span>
-              </div>
-              <div className="space-y-3">
-                {pendingRequests.map((req) => {
-                  const pkg = TOKEN_PACKAGES.find((p) => p.id === req.productId)
-                  return (
-                    <div key={req.id} className="bg-amber-50 rounded-2xl p-4">
-                      <p className="text-sm text-gray-700 mb-1">{req.studentName}이(가) 토큰 충전을 요청했어요</p>
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="font-black text-gray-900">{pkg?.label ?? `${req.tokens} TOKEN`}</p>
-                        <p className="font-black text-amber-600">{req.price.toLocaleString()}원</p>
-                      </div>
-                      <p className="text-xs text-gray-400 mb-3">요청 시간 {new Date(req.createdAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</p>
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="danger" className="flex-1" onClick={() => handleReject(req.id)}>
-                          <XCircle size={14} /> 거절
-                        </Button>
-                        <Button size="sm" variant="primary" className="flex-1" onClick={() => handleApprove(req.id)}>
-                          <CheckCircle size={14} /> 결제 승인
-                        </Button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="px-5 mt-4">
           <div className="bg-white rounded-card p-4">
             <h3 className="font-bold text-gray-900 mb-3">최근 학습 기록</h3>
             <div className="space-y-2">
@@ -239,5 +248,14 @@ export default function ParentDashboard() {
         </div>
       </div>
     </MobileLayout>
+  )
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-sm text-gray-500">{label}</span>
+      <span className="text-sm font-bold text-gray-900">{value}</span>
+    </div>
   )
 }

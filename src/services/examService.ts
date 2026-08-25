@@ -1,6 +1,6 @@
 import { ExamResult, ExamConfig, Question, QuestionAttempt } from '../types'
 import { analyzeWeakness } from './aiService'
-import { calculateReward } from './tokenService'
+import { awardExamReward } from './tokenService'
 import { buildMockKoreanHistory } from '../data/mockAttemptHistory'
 
 const STORAGE_KEY = 'studyai_exam_history'
@@ -20,13 +20,13 @@ export async function buildExamResult(
   })
   const score = Math.round((correct / questions.length) * 100)
   const conceptAnalysis = await analyzeWeakness(questions, answers)
-  const tokensEarned = calculateReward(score)
   const previousScore = getPreviousScore(userId, config.subjectName)
   const examId = `exam_${Date.now()}`
 
+  // Reward는 점수 구간만으로 정해지되, 학생의 활성 Reward Pool 잔여 한도를 넘을 수 없다(섹션 4).
+  const { tokensAwarded, capped } = awardExamReward(userId, examId, score)
+
   const targetScoreMet = config.targetScore !== undefined && score > config.targetScore
-  // 토큰 보상은 점수 구간(calculateReward)만으로 정해진다 — 목표 달성 보너스는 지급하지 않는다.
-  const targetScoreBonusTokens = 0
 
   const result: ExamResult = {
     examId,
@@ -39,7 +39,7 @@ export async function buildExamResult(
     score,
     correctCount: correct,
     wrongCount: questions.length - correct,
-    tokensEarned,
+    tokensEarned: tokensAwarded,
     tokensSpent: 0,
     completedAt: new Date().toISOString(),
     duration,
@@ -49,7 +49,7 @@ export async function buildExamResult(
     flaggedQuestionIds,
     targetScore: config.targetScore,
     targetScoreMet,
-    targetScoreBonusTokens,
+    rewardCapped: capped,
   }
 
   saveExamResult(result)

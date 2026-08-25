@@ -10,15 +10,16 @@ import { Button } from '../components/ui/Button'
 import { useAppStore } from '../hooks/useAppStore'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { getExamHistory } from '../services/examService'
+import { getWallet } from '../services/tokenService'
 import { CORE_SUBJECTS } from '../config/curriculumConfig'
-import { TOKEN_REWARDS } from '../config/tokenConfig'
+import { SCORE_REWARD_TIERS } from '../config/tokenConfig'
 import { StudentUser } from '../types'
 
 const TOKEN_RULE_ROWS = [
-  { label: '90점 이상', reward: TOKEN_REWARDS.score_90_plus },
-  { label: '80~89점', reward: TOKEN_REWARDS.score_80_89 },
-  { label: '60~79점', reward: TOKEN_REWARDS.score_60_79 },
-  { label: '60점 미만', reward: TOKEN_REWARDS.score_below_60 },
+  { label: '100점', reward: SCORE_REWARD_TIERS.score_100 },
+  { label: '90~99점', reward: SCORE_REWARD_TIERS.score_90_99 },
+  { label: '80~89점', reward: SCORE_REWARD_TIERS.score_80_89 },
+  { label: '80점 미만', reward: SCORE_REWARD_TIERS.score_below_80 },
 ]
 
 export default function StudentHome() {
@@ -34,6 +35,7 @@ export default function StudentHome() {
 
   const history = getExamHistory(student.id)
   const recent = history.slice(0, 3)
+  const wallet = getWallet(student.id)
   const gradeLabel =
     student.schoolLevel === 'elementary'
       ? '초등학교 6학년'
@@ -51,9 +53,9 @@ export default function StudentHome() {
               <p className="text-xs text-gray-400 mt-0.5">{gradeLabel}</p>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => navigate('/tokens')} className="flex items-center gap-1.5 bg-amber-50 px-3 py-2 rounded-chip">
-                <span className="text-lg">🪙</span>
-                <span className="font-black text-amber-600 text-sm">{student.tokens}</span>
+              <button onClick={() => navigate('/rewards')} className="flex items-center gap-1.5 bg-amber-50 px-3 py-2 rounded-chip">
+                <span className="text-lg">🎁</span>
+                <span className="font-black text-amber-600 text-sm">{wallet.balance}</span>
               </button>
               <button onClick={() => setShowTokenRules(true)} className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-400">
                 <HelpCircle size={16} />
@@ -118,13 +120,13 @@ export default function StudentHome() {
 
       <BottomNav />
 
-      <BottomSheet open={showTokenRules} onClose={() => setShowTokenRules(false)} title="게임 토큰은 어떻게 얻나요?">
-        <p className="text-sm text-gray-600 mb-4">시험을 완료하면 점수에 따라 게임 토큰을 받아요. 낮은 점수를 받아도 최소 토큰은 받을 수 있어요.</p>
+      <BottomSheet open={showTokenRules} onClose={() => setShowTokenRules(false)} title="Reward Token은 어떻게 얻나요?">
+        <p className="text-sm text-gray-600 mb-4">시험을 완료하면 점수 구간에 따라 Reward Token을 받아요. 획득액은 이번 달 Reward Pool 한도를 넘을 수 없어요.</p>
         <div className="space-y-2">
           {TOKEN_RULE_ROWS.map((item) => (
             <div key={item.label} className="flex items-center justify-between py-1.5">
               <span className="text-sm text-gray-700">{item.label}</span>
-              <span className="font-bold text-amber-500">+{item.reward} 🪙</span>
+              <span className="font-bold text-amber-500">+{item.reward} 🎁</span>
             </div>
           ))}
         </div>

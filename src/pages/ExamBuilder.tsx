@@ -3,15 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { MobileLayout } from '../components/layout/MobileLayout'
 import { AppHeader } from '../components/layout/AppHeader'
 import { Button } from '../components/ui/Button'
-import { TokenInsufficientSheet } from '../components/features/TokenInsufficientSheet'
 import { AdBanner } from '../components/ads/AdBanner'
 import { useAppStore } from '../hooks/useAppStore'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { CORE_SUBJECTS, getCoreSubjectUnits } from '../config/curriculumConfig'
 import { UNIFIED_EXAM_TYPES, mapUnifiedExamType, UnifiedExamType } from '../config/examModeConfig'
-import { EXAM_TOKEN_COST } from '../config/tokenConfig'
-import { spendForExam } from '../services/tokenService'
-import { saveUser } from '../services/authService'
 import { StudentUser, ExamConfig, ExamType } from '../types'
 
 const DIFFICULTY_OPTIONS = [
@@ -30,7 +26,7 @@ const TARGET_SCORES = [70, 80, 90, 100] as const
 
 export default function ExamBuilder() {
   const navigate = useNavigate()
-  const { user, setUser, setPendingExamConfig, setPendingBlueprint } = useAppStore()
+  const { user, setPendingExamConfig, setPendingBlueprint } = useAppStore()
   const student = user as StudentUser
 
   const [currentSubject, setCurrentSubject] = useLocalStorage(
@@ -50,7 +46,6 @@ export default function ExamBuilder() {
   const [examTypeId, setExamTypeId] = useState<UnifiedExamType>('real_exam')
   const [questionCount, setQuestionCount] = useState<number>(10)
   const [targetScore, setTargetScore] = useState<number>(80)
-  const [showTokenSheet, setShowTokenSheet] = useState(false)
   const [starting, setStarting] = useState(false)
 
   // 과목이 바뀌면 그 과목 기준 단원 목록이 달라지므로 선택을 초기화한다.
@@ -60,7 +55,6 @@ export default function ExamBuilder() {
   }
 
   const selectedUnit = unitOptions.find((u) => u.id === unitId) ?? unitOptions[0]
-  const tokenCost = EXAM_TOKEN_COST
 
   const config: ExamConfig = useMemo(() => {
     const examMode = mapUnifiedExamType(student.schoolLevel, examTypeId)
@@ -84,16 +78,7 @@ export default function ExamBuilder() {
   }, [student.schoolLevel, student.grade, examTypeId, currentSubject, subjectMeta.name, unitId, selectedUnit.name, difficulty, questionCount, targetScore, similarity])
 
   const handleStart = () => {
-    if (student.tokens < tokenCost) {
-      setShowTokenSheet(true)
-      return
-    }
     setStarting(true)
-    const wallet = spendForExam(student.id, tokenCost, `${subjectMeta.name} ${UNIFIED_EXAM_TYPES.find((t) => t.id === examTypeId)?.label} 응시`)
-    const updatedUser: StudentUser = { ...student, tokens: wallet.balance }
-    saveUser(updatedUser)
-    setUser(updatedUser)
-
     setPendingExamConfig(config)
     setPendingBlueprint(null)
     navigate('/exam/generating')
@@ -231,17 +216,10 @@ export default function ExamBuilder() {
       </div>
 
       <div className="px-5 pt-3 pb-6 bg-white border-t border-gray-100 space-y-2">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-500">사용 Token</span>
-          <span className="font-black text-amber-500">🪙 {tokenCost}</span>
-        </div>
-        <p className="text-[11px] text-gray-400">충전 Token부터 사용됩니다.</p>
         <Button fullWidth size="lg" loading={starting} onClick={handleStart}>
           시험 시작
         </Button>
       </div>
-
-      <TokenInsufficientSheet open={showTokenSheet} onClose={() => setShowTokenSheet(false)} currentTokens={student.tokens} required={tokenCost} />
     </MobileLayout>
   )
 }

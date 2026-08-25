@@ -7,7 +7,7 @@ import { BottomSheet } from '../components/ui/BottomSheet'
 import { useAppStore } from '../hooks/useAppStore'
 import { useExamTimer } from '../hooks/useExamTimer'
 import { buildExamResult } from '../services/examService'
-import { earnReward } from '../services/tokenService'
+import { getWallet } from '../services/tokenService'
 import { saveUser } from '../services/authService'
 import { StudentUser, QuestionAttempt } from '../types'
 
@@ -113,7 +113,7 @@ export default function Exam() {
 
     const result = await buildExamResult(config, questions, answers, student.id, duration, flaggedIds, attempts)
 
-    const wallet = earnReward(student.id, result.tokensEarned, `${config.subjectName} 시험 ${result.score}점 보상`)
+    const wallet = getWallet(student.id)
     const updatedUser: StudentUser = { ...student, tokens: wallet.balance }
     setUser(updatedUser)
     saveUser(updatedUser)

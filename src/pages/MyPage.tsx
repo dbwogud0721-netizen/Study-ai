@@ -5,6 +5,7 @@ import { BottomNav } from '../components/layout/BottomNav'
 import { AdBanner } from '../components/ads/AdBanner'
 import { useAppStore } from '../hooks/useAppStore'
 import { logout } from '../services/authService'
+import { getWallet } from '../services/tokenService'
 import { StudentUser } from '../types'
 import { MOCK_SUBJECT_STATS } from '../data/mockExamHistory'
 
@@ -12,6 +13,7 @@ export default function MyPage() {
   const navigate = useNavigate()
   const { user, setUser } = useAppStore()
   const student = user as StudentUser
+  const wallet = getWallet(student.id)
 
   const grade = student?.schoolLevel === 'middle' ? `중학교 ${student.grade}학년` : `고등학교 ${student.grade}학년`
   const avgScore = 82
@@ -58,8 +60,8 @@ export default function MyPage() {
                 <p className="text-xs opacity-80 mt-1">연속 학습</p>
               </div>
               <div>
-                <p className="text-2xl font-black">{student?.tokens ?? 12}</p>
-                <p className="text-xs opacity-80 mt-1">보유 토큰</p>
+                <p className="text-2xl font-black">{wallet.balance}</p>
+                <p className="text-xs opacity-80 mt-1">보유 Reward</p>
               </div>
             </div>
           </div>

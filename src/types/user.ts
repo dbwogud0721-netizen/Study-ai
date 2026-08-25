@@ -1,5 +1,4 @@
 import { SchoolLevel, Grade } from './curriculum'
-import { TokenPurchaseRequest } from './token'
 
 export type AccountType = 'student' | 'parent'
 export type { SchoolLevel, Grade }
@@ -36,5 +35,4 @@ export interface StudentUser extends User {
 export interface ParentUser extends User {
   accountType: 'parent'
   linkedStudentIds: string[]
-  pendingPaymentRequests: TokenPurchaseRequest[]
 }

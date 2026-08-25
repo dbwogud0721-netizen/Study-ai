@@ -1,11 +1,10 @@
 import { useNavigate } from 'react-router-dom'
-import { BarChart2, RotateCcw, Wallet as WalletIcon, Home } from 'lucide-react'
+import { BarChart2, RotateCcw, Gift, Home } from 'lucide-react'
 import { MobileLayout } from '../components/layout/MobileLayout'
 import { Button } from '../components/ui/Button'
 import { AdBanner } from '../components/ads/AdBanner'
 import { useAppStore } from '../hooks/useAppStore'
-import { getWallet } from '../services/tokenService'
-import { CASH_CONVERSION_UNIT, computeConversion } from '../config/tokenEconomyConfig'
+import { getWallet, getActiveRewardPool } from '../services/tokenService'
 import { StudentUser } from '../types'
 
 export default function ExamResult() {
@@ -28,9 +27,8 @@ export default function ExamResult() {
       : null
 
   const wallet = getWallet(student.id)
-  const remainder = wallet.balance % CASH_CONVERSION_UNIT
-  const tokensNeeded = remainder === 0 ? 0 : CASH_CONVERSION_UNIT - remainder
-  const nextMilestone = wallet.balance + tokensNeeded
+  const pool = getActiveRewardPool(student.id)
+  const poolExhausted = !!pool && pool.remainingKrw <= 0
 
   return (
     <MobileLayout className="bg-gray-50">
@@ -47,36 +45,35 @@ export default function ExamResult() {
         <div className="mx-5 -mt-6 space-y-3">
           <div className="bg-white rounded-card p-5 shadow-sm">
             <div className="flex items-center gap-3">
-              <span className="text-3xl">🪙</span>
+              <span className="text-3xl">🎁</span>
               <div>
                 <p className="text-xs text-gray-400">Reward Token 획득</p>
                 <p className="text-2xl font-black text-amber-500">+{r.tokensEarned} TOKEN</p>
               </div>
             </div>
-            {r.targetScoreMet && r.targetScoreBonusTokens ? (
-              <div className="mt-3 pt-3 border-t border-gray-50 flex items-center justify-between">
-                <span className="text-xs text-gray-500">🎯 목표 달성 보너스</span>
-                <span className="text-sm font-black text-amber-500">+{r.targetScoreBonusTokens} TOKEN</span>
-              </div>
+            {r.rewardCapped ? (
+              <p className="text-xs text-amber-600 mt-3 pt-3 border-t border-gray-50">
+                이번 달 Reward Pool 잔여 한도까지만 지급됐어요.
+              </p>
             ) : null}
-            <p className="text-xs text-gray-400 mt-3 pt-3 border-t border-gray-50">현재 보유 Token {wallet.balance}</p>
+            <p className="text-xs text-gray-400 mt-3 pt-3 border-t border-gray-50">현재 보유 Reward Token {wallet.balance}</p>
           </div>
 
           <div className="bg-white rounded-card p-4 flex items-center gap-3">
-            <WalletIcon size={22} className="text-amber-500 flex-shrink-0" />
+            <Gift size={22} className="text-amber-500 flex-shrink-0" />
             <p className="flex-1 text-sm text-gray-700">
-              {tokensNeeded > 0 ? (
+              {poolExhausted ? (
+                <>이번 달 Reward를 모두 획득했어요!</>
+              ) : pool ? (
                 <>
-                  <strong>{tokensNeeded} TOKEN</strong>만 더 모으면 {nextMilestone} TOKEN = ₩{computeConversion(nextMilestone).grossAmount.toLocaleString()} 전환 가능
+                  이번 달 <strong>₩{pool.remainingKrw.toLocaleString()}</strong>의 Reward를 더 얻을 수 있어요
                 </>
               ) : (
-                <>
-                  <strong>{wallet.balance} TOKEN</strong> 지금 바로 현금 전환 가능해요!
-                </>
+                <>보유 Reward Token으로 KakaoPay·게임·웹툰과 교환할 수 있어요</>
               )}
             </p>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/tokens')}>
-              토큰 보기
+            <Button variant="ghost" size="sm" onClick={() => navigate('/rewards')}>
+              리워드 보기
             </Button>
           </div>
         </div>

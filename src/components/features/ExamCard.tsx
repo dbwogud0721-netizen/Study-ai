@@ -8,7 +8,6 @@ interface ExamCardProps {
   subtitle?: string
   questionCount: number
   minutes: number
-  tokenCost: number
   difficultyStars?: number
   size?: 'md' | 'lg'
   onClick?: () => void
@@ -16,7 +15,7 @@ interface ExamCardProps {
 
 export function ExamCard({
   badge, badgeColor = 'bg-primary-100 text-primary-600', title, subtitle,
-  questionCount, minutes, tokenCost, difficultyStars, size = 'md', onClick,
+  questionCount, minutes, difficultyStars, size = 'md', onClick,
 }: ExamCardProps) {
   const isLg = size === 'lg'
   return (
@@ -44,7 +43,6 @@ export function ExamCard({
       <div className={`flex items-center gap-3 text-gray-400 ${isLg ? 'mt-4 text-sm' : 'mt-3 text-xs'}`}>
         <span className="flex items-center gap-1"><FileText size={isLg ? 14 : 11} />{questionCount}문제</span>
         <span className="flex items-center gap-1"><Clock size={isLg ? 14 : 11} />{minutes}분</span>
-        <span className="ml-auto flex items-center gap-1 font-bold text-amber-500">🪙 {tokenCost} TOKEN</span>
       </div>
     </button>
   )
