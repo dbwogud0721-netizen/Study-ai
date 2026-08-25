@@ -2,7 +2,6 @@ import { ExamResult, ExamConfig, Question, QuestionAttempt } from '../types'
 import { analyzeWeakness } from './aiService'
 import { calculateReward } from './tokenService'
 import { buildMockKoreanHistory } from '../data/mockAttemptHistory'
-import { TARGET_SCORE_BONUS } from '../config/tokenConfig'
 
 const STORAGE_KEY = 'studyai_exam_history'
 
@@ -26,7 +25,8 @@ export async function buildExamResult(
   const examId = `exam_${Date.now()}`
 
   const targetScoreMet = config.targetScore !== undefined && score > config.targetScore
-  const targetScoreBonusTokens = targetScoreMet ? TARGET_SCORE_BONUS.tokens : 0
+  // 토큰 보상은 점수 구간(calculateReward)만으로 정해진다 — 목표 달성 보너스는 지급하지 않는다.
+  const targetScoreBonusTokens = 0
 
   const result: ExamResult = {
     examId,

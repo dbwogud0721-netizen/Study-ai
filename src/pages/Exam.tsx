@@ -7,9 +7,8 @@ import { BottomSheet } from '../components/ui/BottomSheet'
 import { useAppStore } from '../hooks/useAppStore'
 import { useExamTimer } from '../hooks/useExamTimer'
 import { buildExamResult } from '../services/examService'
-import { earnReward, earnBonus } from '../services/tokenService'
+import { earnReward } from '../services/tokenService'
 import { saveUser } from '../services/authService'
-import { TARGET_SCORE_BONUS } from '../config/tokenConfig'
 import { StudentUser, QuestionAttempt } from '../types'
 
 interface AttemptTrack {
@@ -114,14 +113,7 @@ export default function Exam() {
 
     const result = await buildExamResult(config, questions, answers, student.id, duration, flaggedIds, attempts)
 
-    let wallet = earnReward(student.id, result.tokensEarned, `${config.subjectName} 시험 ${result.score}점 보상`)
-    if (result.targetScoreMet && result.targetScoreBonusTokens) {
-      wallet = earnBonus(
-        student.id,
-        result.targetScoreBonusTokens,
-        `목표 점수 ${result.targetScore}점 초과 달성 보너스 (₩${TARGET_SCORE_BONUS.won.toLocaleString()} 상당)`
-      )
-    }
+    const wallet = earnReward(student.id, result.tokensEarned, `${config.subjectName} 시험 ${result.score}점 보상`)
     const updatedUser: StudentUser = { ...student, tokens: wallet.balance }
     setUser(updatedUser)
     saveUser(updatedUser)

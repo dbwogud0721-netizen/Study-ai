@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { BarChart2, RotateCcw, Wallet as WalletIcon } from 'lucide-react'
+import { BarChart2, RotateCcw, Wallet as WalletIcon, Home } from 'lucide-react'
 import { MobileLayout } from '../components/layout/MobileLayout'
 import { Button } from '../components/ui/Button'
 import { AdBanner } from '../components/ads/AdBanner'
@@ -90,6 +90,9 @@ export default function ExamResult() {
 
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] p-5 bg-white border-t border-gray-100">
         <div className="flex gap-3">
+          <Button variant="secondary" className="!px-3.5" onClick={() => navigate('/home')} aria-label="홈으로">
+            <Home size={16} />
+          </Button>
           <Button variant="secondary" className="flex-1" onClick={() => navigate('/grades')}>
             <BarChart2 size={16} /> 상세 분석
           </Button>
