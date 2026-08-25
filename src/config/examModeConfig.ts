@@ -25,9 +25,32 @@ export const HIGH_EXAM_MODES: ExamModeDef[] = [
 ]
 
 export function getExamModes(schoolLevel: SchoolLevel): ExamModeDef[] {
-  return schoolLevel === 'middle' ? MIDDLE_EXAM_MODES : HIGH_EXAM_MODES
+  return schoolLevel === 'high' ? HIGH_EXAM_MODES : MIDDLE_EXAM_MODES
 }
 
 export function getExamModeDef(schoolLevel: SchoolLevel, id: ExamMode): ExamModeDef | undefined {
   return getExamModes(schoolLevel).find((m) => m.id === id)
+}
+
+// ── 단순화된 시험 생성 화면(ExamBuilder)에서 쓰는 3개짜리 통합 시험 종류 ──
+// 학교급마다 다른 세부 모드 id(practice_full/mock_full 등)를 학생에게 노출하지 않고
+// "실전 모의고사" 하나의 라벨로 통일해서 보여준다.
+export type UnifiedExamType = 'weakness_ai' | 'unit_focus' | 'real_exam'
+
+export interface UnifiedExamTypeDef {
+  id: UnifiedExamType
+  label: string
+  description: string
+  icon: string
+}
+
+export const UNIFIED_EXAM_TYPES: UnifiedExamTypeDef[] = [
+  { id: 'weakness_ai', label: 'AI 취약점 테스트', description: '내가 자주 틀리는 문제 위주', icon: '🤖' },
+  { id: 'unit_focus', label: '단원 테스트', description: '선택한 단원을 집중적으로', icon: '📚' },
+  { id: 'real_exam', label: '실전 모의고사', description: '실제 시험처럼 구성', icon: '🏆' },
+]
+
+export function mapUnifiedExamType(schoolLevel: SchoolLevel, id: UnifiedExamType): ExamMode {
+  if (id === 'real_exam') return schoolLevel === 'high' ? 'mock_full' : 'practice_full'
+  return id
 }

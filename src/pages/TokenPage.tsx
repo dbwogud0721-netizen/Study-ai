@@ -96,10 +96,11 @@ export default function TokenPage() {
             <h3 className="font-bold text-gray-900 mb-3">토큰 획득 방법</h3>
             <div className="space-y-2">
               {[
-                { label: '90점 이상', reward: TOKEN_REWARDS.score_90_plus, icon: '🏆' },
-                { label: '80~89점', reward: TOKEN_REWARDS.score_80_89, icon: '🌟' },
-                { label: '70~79점', reward: TOKEN_REWARDS.score_70_79, icon: '👍' },
-                { label: '70점 미만', reward: TOKEN_REWARDS.score_below_70, icon: '💪' },
+                { label: '100점', reward: TOKEN_REWARDS.score_100, icon: '🏆' },
+                { label: '90~99점', reward: TOKEN_REWARDS.score_90_99, icon: '🌟' },
+                { label: '80~89점', reward: TOKEN_REWARDS.score_80_89, icon: '👍' },
+                { label: '60~79점', reward: TOKEN_REWARDS.score_60_79, icon: '💪' },
+                { label: '60점 미만', reward: TOKEN_REWARDS.score_below_60, icon: '🙂' },
                 { label: '7일 연속 학습', reward: TOKEN_REWARDS.streak_7day, icon: '🔥' },
                 { label: '30일 연속 학습', reward: TOKEN_REWARDS.streak_30day, icon: '🔥🔥' },
               ].map((item) => (

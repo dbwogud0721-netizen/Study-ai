@@ -1,4 +1,4 @@
-export type SchoolLevel = 'middle' | 'high'
+export type SchoolLevel = 'elementary' | 'middle' | 'high'
 export type Grade = 1 | 2 | 3
 
 export interface CurriculumUnit {

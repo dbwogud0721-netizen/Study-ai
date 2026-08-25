@@ -10,6 +10,7 @@ export function currentAcademicYear(today: Date = new Date()): number {
 export function estimateEntryYear(schoolLevel: SchoolLevel, grade: Grade, today: Date = new Date()): number {
   const year = currentAcademicYear(today)
   if (schoolLevel === 'high') return year - (grade - 1)
+  if (schoolLevel === 'elementary') return year + 4 // 초6 → 중1~3(3년) → 고1
   return year + (3 - grade) + 1
 }
 

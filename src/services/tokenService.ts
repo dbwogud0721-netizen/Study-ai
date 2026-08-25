@@ -64,10 +64,11 @@ export function getMonthlyStats(userId: string, now: Date = new Date()): { earne
 }
 
 export function calculateReward(score: number): number {
-  if (score >= 90) return TOKEN_REWARDS.score_90_plus
+  if (score >= 100) return TOKEN_REWARDS.score_100
+  if (score >= 90) return TOKEN_REWARDS.score_90_99
   if (score >= 80) return TOKEN_REWARDS.score_80_89
-  if (score >= 70) return TOKEN_REWARDS.score_70_79
-  return TOKEN_REWARDS.score_below_70
+  if (score >= 60) return TOKEN_REWARDS.score_60_79
+  return TOKEN_REWARDS.score_below_60
 }
 
 export function canAfford(currentTokens: number, cost: number): boolean {

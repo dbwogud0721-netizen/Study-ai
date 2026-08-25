@@ -1,4 +1,5 @@
-import { CurriculumSubject, CurriculumUnit, ExamArea, SchoolLevel } from '../types/curriculum'
+import { CurriculumSubject, CurriculumUnit, ExamArea, SchoolLevel, Grade } from '../types/curriculum'
+import { ELEMENTARY_CURRICULUM, getElementarySubjects } from '../data/curriculum/elementary'
 import { MIDDLE_SCHOOL_CURRICULUM, getMiddleSchoolSubjects } from '../data/curriculum/middleSchool'
 import { HIGH_SCHOOL_CURRICULUM, getHighSchoolSubjects } from '../data/curriculum/highSchool'
 import { EXAM_SYSTEM_VERSIONS, getExamSystemVersion } from '../data/curriculum/examSystem'
@@ -13,7 +14,7 @@ import {
   KOREAN_AREA_MOCK_DEFAULTS,
 } from '../data/examBlueprints/koreanCsat'
 
-export { MIDDLE_SCHOOL_CURRICULUM, HIGH_SCHOOL_CURRICULUM, EXAM_SYSTEM_VERSIONS, getExamSystemVersion }
+export { MIDDLE_SCHOOL_CURRICULUM, HIGH_SCHOOL_CURRICULUM, ELEMENTARY_CURRICULUM, EXAM_SYSTEM_VERSIONS, getExamSystemVersion }
 
 /** taxonomy 트리가 등록된 과목 이름(subjectName 기준). 등록 안 된 과목은 기존 단순 플로우로 폴백. */
 const SUBJECT_TAXONOMIES: Record<string, TaxonomyMajorArea[]> = {
@@ -66,8 +67,67 @@ export function getOfficialMockSpec(subjectName: string): OfficialMockSpec {
 export const CURRENT_CURRICULUM_VERSION = '2022개정'
 
 export function getCurriculumSubjects(schoolLevel: SchoolLevel, grade: number): CurriculumSubject[] {
+  if (schoolLevel === 'elementary') return getElementarySubjects()
   return schoolLevel === 'middle' ? getMiddleSchoolSubjects(grade) : getHighSchoolSubjects(grade)
 }
+
+/**
+ * Home/Onboarding/새 시험 생성 화면에서 쓰는 핵심 4과목. 학년과 무관하게 항상 이 4개만
+ * 노출한다(스펙: "딱 4과목만 표시한다"). 고등학교는 학년마다 수학/과학이 대수·미적분/
+ * 물리·화학 등 여러 실제 과목으로 쪼개져 있어 curriculum id가 grade마다 다르므로,
+ * core subject는 커리큘럼과 별개인 고정 목록으로 둔다. 실제 세부 과목/단원 매칭은
+ * getCoreSubjectUnits(Phase 4, ExamBuilder)에서 처리한다.
+ */
+export const CORE_SUBJECTS: CurriculumSubject[] = [
+  { id: 'kor', name: '국어', icon: '📖', mainSubject: true, units: [] },
+  { id: 'eng', name: '영어', icon: '🌎', mainSubject: true, units: [] },
+  { id: 'math', name: '수학', icon: '📐', mainSubject: true, units: [] },
+  { id: 'sci', name: '과학', icon: '🔬', mainSubject: true, units: [] },
+]
+
+export function getCoreSubjects(): CurriculumSubject[] {
+  return CORE_SUBJECTS
+}
+
+/**
+ * 핵심 과목 하나(kor/eng/math/sci)를 골랐을 때, 해당 학교급·학년에서 실제로 존재하는
+ * 커리큘럼 과목들을 찾아 "단원" chip으로 쓸 {id,name} 목록을 만든다.
+ * - 중/초등, 고1: 보통 과목 id가 그대로 일치 → 그 과목의 실제 단원을 그대로 씀
+ * - 고2/고3: 수학/과학은 여러 실제 과목(대수·미적분/물리·화학 등)으로 쪼개져 있어,
+ *   그 과목들의 "이름" 자체를 하나의 단원 칩으로 취급한다(스펙 예시: [대수][미적분Ⅰ][확률과 통계]).
+ */
+export function getCoreSubjectUnits(schoolLevel: SchoolLevel, grade: number, coreId: string): CurriculumUnit[] {
+  const all = getCurriculumSubjects(schoolLevel, grade)
+  const exact = all.find((s) => s.id === coreId)
+  if (exact) return exact.units
+
+  const prefixMap: Record<string, string[]> = {
+    kor: ['kor'],
+    eng: ['eng'],
+    math: ['math'],
+    sci: ['sci', 'phy', 'chem', 'bio', 'earth'],
+  }
+  const prefixes = prefixMap[coreId] ?? [coreId]
+  const matches = all.filter((s) => prefixes.some((p) => s.id.startsWith(p)))
+  return matches.map((s) => ({ id: s.id, name: s.name }))
+}
+
+export interface GradeOption {
+  schoolLevel: SchoolLevel
+  grade: Grade
+  label: string
+}
+
+/** 온보딩 PAGE2: 학교급+학년을 한 화면에서 한 번만 묻기 위한 통합 리스트. */
+export const GRADE_OPTIONS: GradeOption[] = [
+  { schoolLevel: 'elementary', grade: 1, label: '초등학교 6학년' },
+  { schoolLevel: 'middle', grade: 1, label: '중학교 1학년' },
+  { schoolLevel: 'middle', grade: 2, label: '중학교 2학년' },
+  { schoolLevel: 'middle', grade: 3, label: '중학교 3학년' },
+  { schoolLevel: 'high', grade: 1, label: '고등학교 1학년' },
+  { schoolLevel: 'high', grade: 2, label: '고등학교 2학년' },
+  { schoolLevel: 'high', grade: 3, label: '고등학교 3학년' },
+]
 
 export function getCurriculumSubject(schoolLevel: SchoolLevel, grade: number, subjectId: string): CurriculumSubject | undefined {
   return getCurriculumSubjects(schoolLevel, grade).find((s) => s.id === subjectId)

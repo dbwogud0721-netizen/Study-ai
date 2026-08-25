@@ -21,7 +21,7 @@ export const MOCK_STUDENT: StudentUser = {
   curriculumVersion: CURRENT_CURRICULUM_VERSION,
   examSystemVersion: getExamSystemVersion(studentEntryYear).id,
   selectedSubjects: ['math', 'sci'],
-  learningGoal: 'grade_up',
+  learningGoals: ['grade_up'],
   onboardingCompleted: true,
 }
 

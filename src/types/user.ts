@@ -29,7 +29,7 @@ export interface StudentUser extends User {
   curriculumVersion: string
   examSystemVersion: string
   selectedSubjects: string[]
-  learningGoal?: LearningGoal
+  learningGoals: LearningGoal[]
   onboardingCompleted: boolean
 }
 

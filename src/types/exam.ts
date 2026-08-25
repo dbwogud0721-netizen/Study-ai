@@ -33,6 +33,8 @@ export interface ExamConfig {
   timeLimitMinutes: number
   /** 학생이 직접 설정하는 목표 점수. 실제 점수가 이보다 높으면 토큰 보너스가 지급된다. */
   targetScore?: number
+  /** 문제 스타일: 다양하게(여러 유형 섞기) / 비슷하게(선택 유형 반복) */
+  similarity?: 'DIVERSE' | 'SIMILAR'
 }
 
 export interface BlueprintItem {
@@ -78,6 +80,8 @@ export interface ExamResult {
   targetScore?: number
   targetScoreMet?: boolean
   targetScoreBonusTokens?: number
+  /** 현금 Reward(₩) — 0이면 이번 시험은 Reward 대상이 아니었거나 기준 미달 */
+  cashRewardWon?: number
 }
 
 export interface ConceptAnalysis {

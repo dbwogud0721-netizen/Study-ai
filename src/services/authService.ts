@@ -60,7 +60,7 @@ export interface CreateStudentProfileInput {
   schoolLevel: SchoolLevel
   grade: Grade
   selectedSubjects: string[]
-  learningGoal?: LearningGoal
+  learningGoals: LearningGoal[]
 }
 
 // 온보딩 완료 시 신규 학생 프로필을 생성한다.
@@ -82,7 +82,7 @@ export function createStudentProfile(input: CreateStudentProfileInput): StudentU
     curriculumVersion: CURRENT_CURRICULUM_VERSION,
     examSystemVersion,
     selectedSubjects: input.selectedSubjects,
-    learningGoal: input.learningGoal,
+    learningGoals: input.learningGoals,
     onboardingCompleted: true,
   }
   saveUser(user)
