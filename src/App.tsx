@@ -20,6 +20,7 @@ import MyPage from './pages/MyPage'
 import ParentDashboard from './pages/ParentDashboard'
 import PaymentConfirm from './pages/PaymentConfirm'
 import AILearn from './pages/AILearn'
+import ProblemMaker from './pages/ProblemMaker'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const user = getCurrentUser()
@@ -86,6 +87,7 @@ export default function App() {
         <Route path="/tokens" element={<RequireStudent><TokenPage /></RequireStudent>} />
         <Route path="/my" element={<RequireStudent><MyPage /></RequireStudent>} />
         <Route path="/ai-learn" element={<RequireStudent><AILearn /></RequireStudent>} />
+        <Route path="/problem-maker" element={<RequireStudent><ProblemMaker /></RequireStudent>} />
 
         <Route path="/parent" element={<RequireAuth><ParentDashboard /></RequireAuth>} />
         <Route path="/parent/payment/:requestId" element={<RequireAuth><PaymentConfirm /></RequireAuth>} />

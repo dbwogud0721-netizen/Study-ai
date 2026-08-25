@@ -76,6 +76,23 @@ export default function AILearn() {
             </div>
             <ChevronRight size={18} className="text-gray-300" />
           </button>
+
+          <button
+            onClick={() => navigate('/problem-maker')}
+            className="w-full bg-white rounded-card p-4 flex items-center gap-4 shadow-sm active:scale-[0.98] transition-transform"
+          >
+            <div className="w-12 h-12 bg-violet-50 rounded-chip flex items-center justify-center">
+              <Sparkles className="text-violet-500" size={24} />
+            </div>
+            <div className="flex-1 text-left">
+              <div className="flex items-center gap-2">
+                <p className="font-bold text-gray-900">AI 문제 생성</p>
+                <span className="text-xs bg-violet-100 text-violet-500 font-semibold px-2 py-0.5 rounded-full">NEW</span>
+              </div>
+              <p className="text-xs text-gray-500 mt-0.5">원하는 개수·난이도로 새 문제를 직접 생성</p>
+            </div>
+            <ChevronRight size={18} className="text-gray-300" />
+          </button>
         </div>
 
         <div className="px-5 mt-5">
