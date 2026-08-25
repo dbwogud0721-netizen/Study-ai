@@ -4,11 +4,11 @@ import { AlertTriangle, Flag } from 'lucide-react'
 import { MobileLayout } from '../components/layout/MobileLayout'
 import { Button } from '../components/ui/Button'
 import { BottomSheet } from '../components/ui/BottomSheet'
-import { QuestionNavigator } from '../components/features/QuestionNavigator'
 import { useAppStore } from '../hooks/useAppStore'
-import { useExamTimer, formatTime } from '../hooks/useExamTimer'
+import { useExamTimer } from '../hooks/useExamTimer'
 import { buildExamResult } from '../services/examService'
 import { recordTransaction } from '../services/tokenService'
+import { recordCashReward } from '../services/cashRewardService'
 import { saveUser } from '../services/authService'
 import { TARGET_SCORE_BONUS } from '../config/tokenConfig'
 import { StudentUser, QuestionAttempt } from '../types'
@@ -31,15 +31,16 @@ export default function Exam() {
   const [answers, setAnswers] = useState<Record<string, number>>({})
   const [flaggedIds, setFlaggedIds] = useState<string[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [showNav, setShowNav] = useState(false)
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [startTime] = useState(Date.now())
   const [attemptTracker, setAttemptTracker] = useState<Record<string, AttemptTrack>>({})
   const enterTimeRef = useRef(Date.now())
 
-  const timeLimit = (config?.timeLimitMinutes ?? 20) * 60
-  const { seconds, pause } = useExamTimer(timeLimit, () => handleSubmit())
+  // 타이머는 화면에 노출하지 않는다(스펙: 제한시간 압박 없음). 다만 문제당 3분 정도의
+  // 넉넉한 내부 상한을 안전장치로만 걸어두고, 실제 소요시간은 attemptTracker로 계속 측정한다.
+  const timeLimit = (config?.timeLimitMinutes ?? 30) * 60
+  const { pause } = useExamTimer(timeLimit, () => handleSubmit())
 
   if (!config || questions.length === 0) {
     navigate('/exam/new')
@@ -50,6 +51,7 @@ export default function Exam() {
   const answeredCount = Object.keys(answers).length
   const unansweredCount = questions.length - answeredCount
   const isFlagged = flaggedIds.includes(q.questionId)
+  const isLastQuestion = currentIndex === questions.length - 1
 
   /** 문항 이탈 시 그동안 머문 시간을 해당 문항에 누적한다 */
   const flushTime = (questionId: string) => {
@@ -126,6 +128,9 @@ export default function Exam() {
     const updatedUser: StudentUser = { ...student, tokens: finalBalance }
     setUser(updatedUser)
     saveUser(updatedUser)
+
+    recordCashReward(student.id, result.examId, result.cashRewardWon ?? 0, result.score)
+
     setCurrentExamResult(result)
     navigate('/result')
   }
@@ -135,46 +140,19 @@ export default function Exam() {
   return (
     <MobileLayout className="bg-white">
       <div className="px-5 pt-12 pb-3 border-b border-gray-100">
-        <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center justify-between">
           <span className="text-sm font-bold text-primary-500">{config.subjectName}</span>
-          <button
-            onClick={() => setShowSubmitConfirm(true)}
-            className="text-sm font-bold text-gray-500 bg-gray-100 px-3 py-1.5 rounded-xl"
-          >
-            제출하기
+          <button onClick={toggleFlag} className={isFlagged ? 'text-amber-500' : 'text-gray-300'}>
+            <Flag size={20} fill={isFlagged ? 'currentColor' : 'none'} />
           </button>
         </div>
-        <div className="flex items-center justify-between">
-          <span className="text-2xl font-black text-gray-900">
-            {currentIndex + 1}
-            <span className="text-base font-medium text-gray-400"> / {questions.length}</span>
-          </span>
-          <div className={`text-xl font-black tabular-nums ${seconds < 60 ? 'text-red-500 animate-pulse' : 'text-gray-700'}`}>
-            ⏱ {formatTime(seconds)}
-          </div>
-        </div>
-        <div className="h-1 bg-gray-100 rounded-full mt-2">
-          <div
-            className="h-1 bg-primary-500 rounded-full transition-all"
-            style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
-          />
-        </div>
+        <span className="text-2xl font-black text-gray-900">
+          {currentIndex + 1}
+          <span className="text-base font-medium text-gray-400"> / {questions.length}</span>
+        </span>
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="bg-primary-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">
-            {currentIndex + 1}번
-          </span>
-          <span className="text-xs text-gray-400">{q.unit} · {q.concept}</span>
-          <button
-            onClick={toggleFlag}
-            className={`ml-auto flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full transition-colors ${isFlagged ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400'}`}
-          >
-            <Flag size={12} fill={isFlagged ? 'currentColor' : 'none'} /> 나중에 다시보기
-          </button>
-        </div>
-
         {q.passage && (
           <div className="bg-gray-50 rounded-2xl p-4 mb-4 text-sm text-gray-700 leading-relaxed border-l-4 border-primary-300">
             {q.passage}
@@ -207,43 +185,44 @@ export default function Exam() {
       </div>
 
       <div className="px-5 py-4 bg-white border-t border-gray-100">
-        <div className="flex items-center gap-3 mb-3">
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={currentIndex === 0}
-            onClick={() => goToIndex(currentIndex - 1)}
-            className="flex-1"
-          >
-            ← 이전
+        <div className="flex gap-1.5 overflow-x-auto pb-3 scrollbar-none">
+          {questions.map((qq, i) => {
+            const answered = answers[qq.questionId] !== undefined
+            const flagged = flaggedIds.includes(qq.questionId)
+            const isCurrent = i === currentIndex
+            return (
+              <button
+                key={qq.questionId}
+                onClick={() => goToIndex(i)}
+                className={`w-3 h-3 rounded-full flex-shrink-0 transition-all ${
+                  isCurrent
+                    ? 'bg-primary-500 ring-2 ring-primary-200 scale-125'
+                    : flagged
+                      ? 'bg-amber-400'
+                      : answered
+                        ? 'bg-primary-200'
+                        : 'bg-gray-200'
+                }`}
+                aria-label={`${i + 1}번 문제로 이동`}
+              />
+            )
+          })}
+        </div>
+        <div className="flex items-center gap-3">
+          <Button variant="secondary" size="sm" disabled={currentIndex === 0} onClick={() => goToIndex(currentIndex - 1)} className="flex-1">
+            이전
           </Button>
-          <button
-            onClick={() => setShowNav(true)}
-            className="px-3 py-2 bg-gray-100 rounded-xl text-sm font-semibold text-gray-600"
-          >
-            {answeredCount}/{questions.length}
-          </button>
-          <Button
-            variant={currentIndex < questions.length - 1 ? 'primary' : 'secondary'}
-            size="sm"
-            disabled={currentIndex === questions.length - 1}
-            onClick={() => goToIndex(currentIndex + 1)}
-            className="flex-1"
-          >
-            다음 →
-          </Button>
+          {isLastQuestion ? (
+            <Button variant="primary" size="sm" className="flex-1" onClick={() => setShowSubmitConfirm(true)}>
+              시험 제출
+            </Button>
+          ) : (
+            <Button variant="primary" size="sm" onClick={() => goToIndex(currentIndex + 1)} className="flex-1">
+              다음
+            </Button>
+          )}
         </div>
       </div>
-
-      <BottomSheet open={showNav} onClose={() => setShowNav(false)} title="문제 번호">
-        <QuestionNavigator
-          questions={questions}
-          answers={answers}
-          currentIndex={currentIndex}
-          flaggedIds={flaggedIds}
-          onSelect={(i) => { goToIndex(i); setShowNav(false) }}
-        />
-      </BottomSheet>
 
       <BottomSheet open={showSubmitConfirm} onClose={() => setShowSubmitConfirm(false)} title="답안 제출">
         {unansweredCount > 0 && (

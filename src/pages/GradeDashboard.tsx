@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { BarChart2, Target, Trophy, ListChecks, Timer, TrendingUp } from 'lucide-react'
 import { MobileLayout } from '../components/layout/MobileLayout'
 import { BottomNav } from '../components/layout/BottomNav'
+import { AdBanner } from '../components/ads/AdBanner'
 import { StatCard } from '../components/ui/StatCard'
 import { ProgressBar } from '../components/ui/ProgressBar'
 import { ScoreChart } from '../components/ui/ScoreChart'
@@ -421,6 +422,10 @@ export default function GradeDashboard() {
               ))}
             </div>
           </div>
+        </div>
+
+        <div className="px-5 mt-4">
+          <AdBanner slot="grades" />
         </div>
       </div>
       <BottomNav />

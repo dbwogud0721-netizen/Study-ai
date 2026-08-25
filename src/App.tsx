@@ -24,7 +24,6 @@ import ParentLink from './pages/ParentLink'
 import Help from './pages/Help'
 import ParentDashboard from './pages/ParentDashboard'
 import PaymentConfirm from './pages/PaymentConfirm'
-import AILearn from './pages/AILearn'
 import ProblemMaker from './pages/ProblemMaker'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -96,7 +95,6 @@ export default function App() {
         <Route path="/my/notifications" element={<RequireStudent><NotificationSettings /></RequireStudent>} />
         <Route path="/my/parent-link" element={<RequireStudent><ParentLink /></RequireStudent>} />
         <Route path="/my/help" element={<RequireStudent><Help /></RequireStudent>} />
-        <Route path="/ai-learn" element={<RequireStudent><AILearn /></RequireStudent>} />
         <Route path="/problem-maker" element={<RequireStudent><ProblemMaker /></RequireStudent>} />
 
         <Route path="/parent" element={<RequireAuth><ParentDashboard /></RequireAuth>} />

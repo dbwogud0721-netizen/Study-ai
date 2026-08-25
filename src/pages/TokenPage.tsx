@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Plus, ArrowUpCircle, ArrowDownCircle, Gift, Check } from 'lucide-react'
+import { Plus, ArrowUpCircle, ArrowDownCircle, Gift, Check, Wallet } from 'lucide-react'
 import { MobileLayout } from '../components/layout/MobileLayout'
 import { BottomNav } from '../components/layout/BottomNav'
 import { PageHeader } from '../components/layout/PageHeader'
@@ -8,9 +8,9 @@ import { Button } from '../components/ui/Button'
 import { BottomSheet } from '../components/ui/BottomSheet'
 import { TokenProductCard } from '../components/features/TokenProductCard'
 import { useAppStore } from '../hooks/useAppStore'
-import { TOKEN_PACKAGES, TOKEN_REWARDS, TOKEN_COSTS } from '../config/tokenConfig'
-import { getExamModes } from '../config/examModeConfig'
+import { TOKEN_PACKAGES, TOKEN_REWARDS, TOKEN_COST_BY_COUNT, WEAKNESS_AI_SURCHARGE } from '../config/tokenConfig'
 import { getWallet, getMonthlyStats, getTransactions, recordTransaction } from '../services/tokenService'
+import { getCashWallet, requestCashPayout } from '../services/cashRewardService'
 import { requestTokenPurchase } from '../services/paymentService'
 import { saveUser } from '../services/authService'
 import { formatDateFull } from '../utils/formatters'
@@ -28,11 +28,30 @@ export default function TokenPage() {
   const [agreed, setAgreed] = useState(false)
   const [requestSent, setRequestSent] = useState(false)
 
+  const [showPayout, setShowPayout] = useState(false)
+  const [payoutState, setPayoutState] = useState<'confirm' | 'loading' | 'done'>('confirm')
+  const [payoutResult, setPayoutResult] = useState<{ amount: number } | null>(null)
+  const [cashRefreshKey, setCashRefreshKey] = useState(0)
+
   const wallet = getWallet(student.id, student.tokens)
   const monthly = getMonthlyStats(student.id)
   const transactions = getTransactions(student.id).slice(0, 15)
-  const modeCosts = getExamModes(student.schoolLevel)
+  const cashWallet = useMemo(() => getCashWallet(student.id), [student.id, cashRefreshKey])
   const product = TOKEN_PACKAGES.find((p) => p.id === selectedPkg)
+
+  const handleRequestPayout = async () => {
+    setPayoutState('loading')
+    const { amount } = await requestCashPayout(student.id)
+    setPayoutResult({ amount })
+    setPayoutState('done')
+    setCashRefreshKey((k) => k + 1)
+  }
+
+  const closePayout = () => {
+    setShowPayout(false)
+    setPayoutState('confirm')
+    setPayoutResult(null)
+  }
 
   const closeCharge = () => { setShowCharge(false); setSelectedPkg(null); setConfirming(false); setAgreed(false) }
 
@@ -58,7 +77,7 @@ export default function TokenPage() {
       <div className="flex-1 overflow-y-auto pb-24">
         <div className="mx-5 mt-2">
           <div className="bg-gradient-to-br from-amber-400 to-orange-500 rounded-card p-6 text-white">
-            <p className="text-sm opacity-80 mb-1">보유 토큰</p>
+            <p className="text-sm opacity-80 mb-1">보유 게임 토큰</p>
             <div className="flex items-end gap-2">
               <span className="text-5xl font-black">{wallet.balance}</span>
               <span className="text-xl mb-1">🪙</span>
@@ -78,15 +97,48 @@ export default function TokenPage() {
 
         <div className="px-5 mt-4">
           <div className="bg-white rounded-card p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Wallet size={18} className="text-amber-500" />
+              <h3 className="font-bold text-gray-900">현금 Reward Wallet</h3>
+            </div>
+            <p className="text-xs text-gray-400 mb-3">게임 토큰과 별개로 관리돼요</p>
+            <div className="grid grid-cols-3 divide-x divide-gray-100 text-center mb-4">
+              <div>
+                <p className="text-lg font-black text-gray-900">₩{cashWallet.available.toLocaleString()}</p>
+                <p className="text-[11px] text-gray-400 mt-0.5">지급 가능</p>
+              </div>
+              <div>
+                <p className="text-lg font-black text-gray-900">₩{cashWallet.pending.toLocaleString()}</p>
+                <p className="text-[11px] text-gray-400 mt-0.5">지급 대기</p>
+              </div>
+              <div>
+                <p className="text-lg font-black text-gray-900">₩{cashWallet.paidTotal.toLocaleString()}</p>
+                <p className="text-[11px] text-gray-400 mt-0.5">누적 지급</p>
+              </div>
+            </div>
+            <Button fullWidth variant="secondary" disabled={cashWallet.available === 0} onClick={() => setShowPayout(true)}>
+              카카오페이로 받기
+            </Button>
+            <p className="text-[11px] text-gray-400 text-center mt-2">실제 서비스에서는 본인/보호자 확인 후 지급됩니다.</p>
+          </div>
+        </div>
+
+        <div className="px-5 mt-4">
+          <div className="bg-white rounded-card p-4">
             <h3 className="font-bold text-gray-900 mb-3">토큰 이용 안내</h3>
             <div className="space-y-2">
-              {modeCosts.map((m) => (
-                <div key={m.id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
-                  <span className="text-lg">{m.icon}</span>
-                  <span className="flex-1 text-sm text-gray-700">{m.label}</span>
-                  <span className="font-bold text-red-400">-{TOKEN_COSTS[m.id] ?? 0} 🪙</span>
+              {Object.entries(TOKEN_COST_BY_COUNT).map(([count, cost]) => (
+                <div key={count} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
+                  <span className="text-lg">📝</span>
+                  <span className="flex-1 text-sm text-gray-700">{count}문제</span>
+                  <span className="font-bold text-red-400">-{cost} 🪙</span>
                 </div>
               ))}
+              <div className="flex items-center gap-3 py-2">
+                <span className="text-lg">🤖</span>
+                <span className="flex-1 text-sm text-gray-700">AI 취약점 테스트 추가 비용</span>
+                <span className="font-bold text-red-400">-{WEAKNESS_AI_SURCHARGE} 🪙</span>
+              </div>
             </div>
           </div>
         </div>
@@ -224,6 +276,41 @@ export default function TokenPage() {
               요청 보내기
             </Button>
             <p className="text-xs text-gray-400 text-center">보호자가 승인하면 결제 확인 후 지급됩니다</p>
+          </div>
+        )}
+      </BottomSheet>
+
+      <BottomSheet open={showPayout} onClose={closePayout} title="카카오페이로 Reward 받기">
+        {payoutState === 'confirm' && (
+          <div className="space-y-4">
+            <div className="bg-gray-50 rounded-2xl p-4 space-y-2">
+              <Row label="지급 금액" value={`₩${cashWallet.available.toLocaleString()}`} />
+              <Row label="받는 사람" value={student.name} />
+              <Row label="지급 방식" value="KakaoPay" />
+            </div>
+            <div className="p-3 bg-amber-50 rounded-2xl text-xs text-amber-700">
+              🔧 DEV MOCK — 실제 송금은 발생하지 않아요. 투자자 Demo용 화면입니다.
+            </div>
+            <Button fullWidth onClick={handleRequestPayout}>
+              지급 요청
+            </Button>
+          </div>
+        )}
+        {payoutState === 'loading' && (
+          <div className="py-10 flex flex-col items-center gap-4">
+            <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm text-gray-500">지급을 처리하고 있어요...</p>
+          </div>
+        )}
+        {payoutState === 'done' && payoutResult && (
+          <div className="py-6 text-center">
+            <p className="text-4xl mb-3">✅</p>
+            <p className="font-bold text-gray-900 mb-1">지급이 완료되었습니다.</p>
+            <p className="text-3xl font-black text-gray-900 mt-3">₩{payoutResult.amount.toLocaleString()}</p>
+            <p className="text-sm text-gray-500 mt-1">KakaoPay 지급 완료</p>
+            <Button fullWidth className="mt-6" onClick={closePayout}>
+              확인
+            </Button>
           </div>
         )}
       </BottomSheet>

@@ -1,105 +1,93 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Flame, ChevronRight } from 'lucide-react'
+import { HelpCircle, ChevronRight } from 'lucide-react'
 import { MobileLayout } from '../components/layout/MobileLayout'
 import { BottomNav } from '../components/layout/BottomNav'
-import { ExamCard } from '../components/features/ExamCard'
-import { AIInsightCard } from '../components/features/AIInsightCard'
+import { AdBanner } from '../components/ads/AdBanner'
 import { ExamHistoryItem } from '../components/features/ExamHistoryItem'
-import { ScoreChart } from '../components/ui/ScoreChart'
+import { BottomSheet } from '../components/ui/BottomSheet'
+import { Button } from '../components/ui/Button'
 import { useAppStore } from '../hooks/useAppStore'
-import { MOCK_RECOMMENDATIONS } from '../data/recommendations'
+import { useLocalStorage } from '../hooks/useLocalStorage'
 import { getExamHistory } from '../services/examService'
-import { generateAIInsight } from '../services/analytics'
-import { TOKEN_COSTS } from '../config/tokenConfig'
-import { getCsatDday } from '../utils/academicYear'
+import { CORE_SUBJECTS } from '../config/curriculumConfig'
+import { TOKEN_REWARDS } from '../config/tokenConfig'
 import { StudentUser } from '../types'
 
+const TOKEN_RULE_ROWS = [
+  { label: '100점', reward: TOKEN_REWARDS.score_100 },
+  { label: '90~99점', reward: TOKEN_REWARDS.score_90_99 },
+  { label: '80~89점', reward: TOKEN_REWARDS.score_80_89 },
+  { label: '60~79점', reward: TOKEN_REWARDS.score_60_79 },
+  { label: '60점 미만', reward: TOKEN_REWARDS.score_below_60 },
+]
+
 export default function StudentHome() {
+  const navigate = useNavigate()
   const { user } = useAppStore()
   const student = user as StudentUser
-  if (!student) return null
 
-  return student.schoolLevel === 'middle' ? <MiddleHome student={student} /> : <HighHome student={student} />
-}
-
-function TopBar({ student }: { student: StudentUser }) {
-  const navigate = useNavigate()
-  return (
-    <div className="bg-white px-5 pt-12 pb-4">
-      <div className="flex items-center justify-between mb-1">
-        <div>
-          <p className="text-sm text-gray-500">안녕,</p>
-          <h1 className="text-2xl font-black text-gray-900">{student.name} 👋</h1>
-        </div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/tokens')} className="flex items-center gap-1.5 bg-amber-50 px-3 py-2 rounded-chip">
-            <span className="text-lg">🪙</span>
-            <span className="font-black text-amber-600 text-sm">{student.tokens}</span>
-          </button>
-          <button className="w-9 h-9 bg-gray-100 rounded-chip flex items-center justify-center text-gray-500">
-            <Bell size={18} />
-          </button>
-        </div>
-      </div>
-    </div>
+  const [showTokenRules, setShowTokenRules] = useState(false)
+  const [currentSubject, setCurrentSubject] = useLocalStorage(
+    `studyai_current_subject_${student.id}`,
+    student.selectedSubjects[0] ?? CORE_SUBJECTS[0].id
   )
-}
 
-function MiddleHome({ student }: { student: StudentUser }) {
-  const navigate = useNavigate()
   const history = getExamHistory(student.id)
   const recent = history.slice(0, 3)
-  const attempts = history.flatMap((r) => r.attempts)
-  const questions = history.flatMap((r) => r.questions)
-  const insight = attempts.length >= 10 ? generateAIInsight(attempts, questions) : null
-  const rec = MOCK_RECOMMENDATIONS[0]
+  const gradeLabel =
+    student.schoolLevel === 'elementary'
+      ? '초등학교 6학년'
+      : `${student.schoolLevel === 'middle' ? '중학교' : '고등학교'} ${student.grade}학년`
+  const subjectMeta = CORE_SUBJECTS.find((s) => s.id === currentSubject) ?? CORE_SUBJECTS[0]
 
   return (
     <MobileLayout>
-      <div className="flex-1 pb-24 overflow-y-auto">
-        <TopBar student={student} />
-        <p className="px-5 -mt-2 text-sm text-gray-500">오늘은 어떤 시험에 도전할까요?</p>
-
-        {student.streak > 0 && (
-          <div className="mx-5 mt-4">
-            <div className="bg-gradient-to-r from-orange-500 to-amber-500 rounded-card p-4 flex items-center gap-3 text-white">
-              <Flame size={28} />
-              <div>
-                <p className="text-sm opacity-80">연속 학습</p>
-                <p className="text-xl font-black">{student.streak}일째 🔥</p>
-              </div>
-              <div className="ml-auto text-right">
-                <p className="text-xs opacity-80">오늘 학습하면</p>
-                <p className="text-sm font-bold">+2 보너스!</p>
-              </div>
+      <div className="flex-1 overflow-y-auto pb-24">
+        <div className="bg-white px-5 pt-12 pb-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500">안녕,</p>
+              <h1 className="text-2xl font-black text-gray-900">{student.name} 👋</h1>
+              <p className="text-xs text-gray-400 mt-0.5">{gradeLabel}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => navigate('/tokens')} className="flex items-center gap-1.5 bg-amber-50 px-3 py-2 rounded-chip">
+                <span className="text-lg">🪙</span>
+                <span className="font-black text-amber-600 text-sm">{student.tokens}</span>
+              </button>
+              <button onClick={() => setShowTokenRules(true)} className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-400">
+                <HelpCircle size={16} />
+              </button>
             </div>
           </div>
-        )}
-
-        <div className="px-5 mt-6">
-          <h2 className="font-black text-gray-900 mb-3">오늘의 추천 시험</h2>
-          <ExamCard
-            badge="AI 추천"
-            title={rec.title}
-            subtitle={rec.description}
-            questionCount={rec.questionCount}
-            minutes={rec.estimatedMinutes}
-            tokenCost={rec.tokenCost}
-            difficultyStars={rec.difficulty === 'hard' ? 4 : rec.difficulty === 'medium' ? 3 : 2}
-            size="lg"
-            onClick={() => navigate('/exam/new')}
-          />
+          {student.streak > 0 && <p className="text-sm text-orange-500 font-bold mt-2">🔥 {student.streak}일 연속</p>}
         </div>
 
-        {insight && (
-          <div className="px-5 mt-4">
-            <AIInsightCard
-              title="AI가 발견한 취약점"
-              message={insight.chain[0]}
-              action={{ label: '취약점 테스트', onClick: () => navigate('/exam/new?mode=weakness_ai') }}
-            />
+        <div className="px-5 mt-5">
+          <h2 className="font-black text-gray-900 mb-3">오늘의 시험</h2>
+          <div className="bg-gradient-to-br from-primary-500 to-violet-600 rounded-card p-5 text-white">
+            <p className="text-sm opacity-80 mb-1">{subjectMeta.name}</p>
+            <p className="text-lg font-black mb-4">새로운 AI 시험을 만들어볼까요?</p>
+            <Button fullWidth variant="secondary" className="!bg-white !text-primary-600" onClick={() => navigate('/exam/new')}>
+              시험 만들기
+            </Button>
           </div>
-        )}
+        </div>
+
+        <div className="px-5 mt-4 flex gap-2">
+          {CORE_SUBJECTS.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => setCurrentSubject(s.id)}
+              className={`flex-1 py-2.5 rounded-chip text-sm font-bold transition-all ${
+                currentSubject === s.id ? 'bg-primary-500 text-white' : 'bg-white text-gray-600'
+              }`}
+            >
+              {s.name}
+            </button>
+          ))}
+        </div>
 
         <div className="px-5 mt-6">
           <div className="flex items-center justify-between mb-3">
@@ -117,97 +105,31 @@ function MiddleHome({ student }: { student: StudentUser }) {
                 date={h.completedAt}
                 questionCount={h.questions.length}
                 score={h.score}
-                tokensEarned={h.tokensEarned}
                 onClick={() => navigate('/grades')}
               />
             ))}
             {recent.length === 0 && <p className="text-sm text-gray-400 text-center py-6">아직 응시한 시험이 없어요</p>}
           </div>
         </div>
-      </div>
-      <BottomNav />
-    </MobileLayout>
-  )
-}
-
-function HighHome({ student }: { student: StudentUser }) {
-  const navigate = useNavigate()
-  const dday = getCsatDday(student.entryYear)
-  const history = getExamHistory(student.id)
-  const attempts = history.flatMap((r) => r.attempts)
-  const questions = history.flatMap((r) => r.questions)
-  const insight = attempts.length >= 10 ? generateAIInsight(attempts, questions) : null
-  const trend = history.slice(0, 5).reverse().map((h) => ({ label: h.completedAt.slice(5, 10), score: h.score }))
-
-  return (
-    <MobileLayout>
-      <div className="flex-1 pb-24 overflow-y-auto">
-        <TopBar student={student} />
-
-        <div className="px-5 -mt-1">
-          <div className="flex items-center gap-2">
-            <span className="text-xs bg-gray-900 text-white font-bold px-2.5 py-1 rounded-full">D-{dday}</span>
-            <span className="text-sm text-gray-500">수능까지</span>
-          </div>
-        </div>
-
-        <div className="px-5 mt-5">
-          <h2 className="font-black text-gray-900 mb-3">오늘의 AI 모의고사</h2>
-          <ExamCard
-            badge="수학"
-            title="AI 실전 모의고사 #024"
-            subtitle="함수 · 확률과 통계 · 수열"
-            questionCount={30}
-            minutes={60}
-            tokenCost={TOKEN_COSTS.mock_full}
-            difficultyStars={3}
-            size="lg"
-            onClick={() => navigate('/exam/new?mode=mock_full')}
-          />
-        </div>
-
-        <div className="px-5 mt-5">
-          <h2 className="font-black text-gray-900 mb-3">빠른 시작</h2>
-          <div className="grid grid-cols-3 gap-3">
-            <QuickStartButton emoji="⏱️" label="미니 모의고사" sub="10문제" onClick={() => navigate('/exam/new?mode=mock_mini')} />
-            <QuickStartButton emoji="🤖" label="취약점 집중" sub="AI 맞춤" onClick={() => navigate('/exam/new?mode=weakness_ai')} />
-            <QuickStartButton emoji="🎯" label="전체 범위" sub="실전 모의고사" onClick={() => navigate('/exam/new?mode=mock_full')} />
-          </div>
-        </div>
 
         <div className="px-5 mt-6">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-black text-gray-900">최근 성적 추이</h2>
-            <button onClick={() => navigate('/grades')} className="text-sm text-primary-500 flex items-center gap-0.5">
-              전체 <ChevronRight size={14} />
-            </button>
-          </div>
-          <div className="bg-white rounded-card p-4">
-            <ScoreChart data={trend} height={120} compact />
-          </div>
+          <AdBanner slot="home" />
         </div>
-
-        {insight && (
-          <div className="px-5 mt-4">
-            <AIInsightCard
-              title="AI 분석"
-              message={insight.chain[0]}
-              action={{ label: '분석 보기', onClick: () => navigate('/grades') }}
-            />
-          </div>
-        )}
       </div>
-      <BottomNav />
-    </MobileLayout>
-  )
-}
 
-function QuickStartButton({ emoji, label, sub, onClick }: { emoji: string; label: string; sub: string; onClick: () => void }) {
-  return (
-    <button onClick={onClick} className="bg-white rounded-card p-3 flex flex-col items-center text-center gap-1 shadow-sm active:scale-95 transition-transform">
-      <span className="text-2xl">{emoji}</span>
-      <span className="text-xs font-bold text-gray-800">{label}</span>
-      <span className="text-[10px] text-gray-400">{sub}</span>
-    </button>
+      <BottomNav />
+
+      <BottomSheet open={showTokenRules} onClose={() => setShowTokenRules(false)} title="게임 토큰은 어떻게 얻나요?">
+        <p className="text-sm text-gray-600 mb-4">시험을 완료하면 점수에 따라 게임 토큰을 받아요. 낮은 점수를 받아도 최소 토큰은 받을 수 있어요.</p>
+        <div className="space-y-2">
+          {TOKEN_RULE_ROWS.map((item) => (
+            <div key={item.label} className="flex items-center justify-between py-1.5">
+              <span className="text-sm text-gray-700">{item.label}</span>
+              <span className="font-bold text-amber-500">+{item.reward} 🪙</span>
+            </div>
+          ))}
+        </div>
+      </BottomSheet>
+    </MobileLayout>
   )
 }

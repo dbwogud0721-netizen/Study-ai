@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight, LogOut, User, Shield, Bell, HelpCircle, BookOpen } from 'lucide-react'
+import { ChevronRight, LogOut, User, Shield, Bell, HelpCircle, BookOpen, Sparkles } from 'lucide-react'
 import { MobileLayout } from '../components/layout/MobileLayout'
 import { BottomNav } from '../components/layout/BottomNav'
+import { AdBanner } from '../components/ads/AdBanner'
 import { useAppStore } from '../hooks/useAppStore'
 import { logout } from '../services/authService'
 import { StudentUser } from '../types'
@@ -90,6 +91,7 @@ export default function MyPage() {
             <MenuItem icon={<Bell size={18} />} label="알림 설정" onClick={() => navigate('/my/notifications')} />
             <MenuItem icon={<Shield size={18} />} label="보호자 연결" onClick={() => navigate('/my/parent-link')} />
             <MenuItem icon={<HelpCircle size={18} />} label="도움말" onClick={() => navigate('/my/help')} />
+            <MenuItem icon={<Sparkles size={18} />} label="AI 문제 생성" onClick={() => navigate('/problem-maker')} />
           </div>
         </div>
 
@@ -103,6 +105,10 @@ export default function MyPage() {
               <span className="font-semibold">로그아웃</span>
             </button>
           </div>
+        </div>
+
+        <div className="px-5 mt-4">
+          <AdBanner slot="my" />
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6 mb-4">StudyAI v0.1.0 · MVP</p>
