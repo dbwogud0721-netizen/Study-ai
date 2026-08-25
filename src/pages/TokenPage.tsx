@@ -1,16 +1,18 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Plus, ArrowUpCircle, ArrowDownCircle, Gift, Check, Wallet } from 'lucide-react'
+import { Plus, ArrowUpCircle, ArrowDownCircle, Gift, Check, Minus, Wallet } from 'lucide-react'
 import { MobileLayout } from '../components/layout/MobileLayout'
 import { BottomNav } from '../components/layout/BottomNav'
-import { PageHeader } from '../components/layout/PageHeader'
+import { AppHeader } from '../components/layout/AppHeader'
 import { Button } from '../components/ui/Button'
 import { BottomSheet } from '../components/ui/BottomSheet'
 import { TokenProductCard } from '../components/features/TokenProductCard'
 import { useAppStore } from '../hooks/useAppStore'
-import { TOKEN_PACKAGES, TOKEN_REWARDS, TOKEN_COST_BY_COUNT, WEAKNESS_AI_SURCHARGE } from '../config/tokenConfig'
-import { getWallet, getMonthlyStats, getTransactions, recordTransaction } from '../services/tokenService'
-import { getCashWallet, requestCashPayout } from '../services/cashRewardService'
+import { TOKEN_PACKAGES } from '../config/tokenEconomyConfig'
+import { TOKEN_REWARDS, TOKEN_COST_BY_COUNT, WEAKNESS_AI_SURCHARGE } from '../config/tokenConfig'
+import { CASH_CONVERSION_UNIT, CASH_CONVERSION_FEE_RATE, computeConversion, getMaxConvertibleTokens } from '../config/tokenEconomyConfig'
+import { getWallet, getMonthlyStats, getTransactions, purchaseTokens, convertRewardToCash } from '../services/tokenService'
+import { mockRewardProvider } from '../services/payments/MockRewardProvider'
 import { requestTokenPurchase } from '../services/paymentService'
 import { saveUser } from '../services/authService'
 import { formatDateFull } from '../utils/formatters'
@@ -28,39 +30,53 @@ export default function TokenPage() {
   const [agreed, setAgreed] = useState(false)
   const [requestSent, setRequestSent] = useState(false)
 
-  const [showPayout, setShowPayout] = useState(false)
-  const [payoutState, setPayoutState] = useState<'confirm' | 'loading' | 'done'>('confirm')
-  const [payoutResult, setPayoutResult] = useState<{ amount: number } | null>(null)
-  const [cashRefreshKey, setCashRefreshKey] = useState(0)
+  const [wallet, setWallet] = useState(() => getWallet(student.id))
+  const [showConvert, setShowConvert] = useState(false)
+  const [convertState, setConvertState] = useState<'select' | 'loading' | 'done' | 'fail'>('select')
+  const [convertAmount, setConvertAmount] = useState(() => getMaxConvertibleTokens(wallet.rewardBalance))
+  const [convertedNet, setConvertedNet] = useState(0)
 
-  const wallet = getWallet(student.id, student.tokens)
   const monthly = getMonthlyStats(student.id)
   const transactions = getTransactions(student.id).slice(0, 15)
-  const cashWallet = useMemo(() => getCashWallet(student.id), [student.id, cashRefreshKey])
   const product = TOKEN_PACKAGES.find((p) => p.id === selectedPkg)
+  const maxConvertible = getMaxConvertibleTokens(wallet.rewardBalance)
+  const conversionPreview = computeConversion(convertAmount)
 
-  const handleRequestPayout = async () => {
-    setPayoutState('loading')
-    const { amount } = await requestCashPayout(student.id)
-    setPayoutResult({ amount })
-    setPayoutState('done')
-    setCashRefreshKey((k) => k + 1)
+  const refreshWallet = () => setWallet(getWallet(student.id))
+
+  const openConvert = () => {
+    setConvertAmount(getMaxConvertibleTokens(wallet.rewardBalance))
+    setConvertState('select')
+    setShowConvert(true)
   }
+  const closeConvert = () => setShowConvert(false)
 
-  const closePayout = () => {
-    setShowPayout(false)
-    setPayoutState('confirm')
-    setPayoutResult(null)
+  const handleConfirmConvert = async () => {
+    setConvertState('loading')
+    const result = await mockRewardProvider.requestPayout(student.id, convertAmount)
+    if (!result.success) {
+      setConvertState('fail')
+      return
+    }
+    // Provider 성공을 확인한 뒤에만 Reward Token을 차감한다.
+    const updated = convertRewardToCash(student.id, convertAmount, `현금 전환 ${convertAmount} TOKEN (KakaoPay)`)
+    setWallet(updated)
+    const updatedUser: StudentUser = { ...student, tokens: updated.balance }
+    setUser(updatedUser)
+    saveUser(updatedUser)
+    setConvertedNet(computeConversion(convertAmount).netAmount)
+    setConvertState('done')
   }
 
   const closeCharge = () => { setShowCharge(false); setSelectedPkg(null); setConfirming(false); setAgreed(false) }
 
   const handlePay = () => {
     if (!product) return
-    const { balanceAfter } = recordTransaction(student.id, student.tokens, 'PURCHASE', product.tokens + product.bonus, `토큰 충전 ${product.label}`)
-    const updated: StudentUser = { ...student, tokens: balanceAfter }
-    setUser(updated)
-    saveUser(updated)
+    const updated = purchaseTokens(student.id, product.tokens, `토큰 충전 ${product.label}`)
+    const updatedUser: StudentUser = { ...student, tokens: updated.balance }
+    setUser(updatedUser)
+    saveUser(updatedUser)
+    refreshWallet()
     closeCharge()
   }
 
@@ -72,16 +88,17 @@ export default function TokenPage() {
 
   return (
     <MobileLayout>
-      <PageHeader title="토큰" showBack={false} />
+      <AppHeader title="토큰" />
 
       <div className="flex-1 overflow-y-auto pb-24">
         <div className="mx-5 mt-2">
           <div className="bg-gradient-to-br from-amber-400 to-orange-500 rounded-card p-6 text-white">
-            <p className="text-sm opacity-80 mb-1">보유 게임 토큰</p>
+            <p className="text-sm opacity-80 mb-1">내 토큰</p>
             <div className="flex items-end gap-2">
               <span className="text-5xl font-black">{wallet.balance}</span>
               <span className="text-xl mb-1">🪙</span>
             </div>
+            <p className="text-xs opacity-80 mt-2">충전 {wallet.purchasedBalance} · 리워드 {wallet.rewardBalance}</p>
             <div className="flex items-center gap-4 mt-4 pt-4 border-t border-white/20">
               <div>
                 <p className="text-xs opacity-70">이번 달 획득</p>
@@ -99,27 +116,25 @@ export default function TokenPage() {
           <div className="bg-white rounded-card p-4">
             <div className="flex items-center gap-2 mb-1">
               <Wallet size={18} className="text-amber-500" />
-              <h3 className="font-bold text-gray-900">현금 Reward Wallet</h3>
+              <h3 className="font-bold text-gray-900">카카오페이로 받을 수 있어요</h3>
             </div>
-            <p className="text-xs text-gray-400 mb-3">게임 토큰과 별개로 관리돼요</p>
-            <div className="grid grid-cols-3 divide-x divide-gray-100 text-center mb-4">
-              <div>
-                <p className="text-lg font-black text-gray-900">₩{cashWallet.available.toLocaleString()}</p>
-                <p className="text-[11px] text-gray-400 mt-0.5">지급 가능</p>
+            <p className="text-xs text-gray-400 mb-3">Reward Token만 현금으로 바꿀 수 있어요 (구매 Token은 전환 불가)</p>
+            {maxConvertible > 0 ? (
+              <div className="bg-amber-50 rounded-2xl p-4 mb-4">
+                <p className="text-sm font-bold text-gray-800 mb-2">{maxConvertible} Reward TOKEN</p>
+                <Row label="Token 가치" value={`₩${computeConversion(maxConvertible).grossAmount.toLocaleString()}`} />
+                <Row label={`수수료 ${Math.round(CASH_CONVERSION_FEE_RATE * 100)}%`} value={`-₩${computeConversion(maxConvertible).feeAmount.toLocaleString()}`} muted />
+                <div className="flex items-center justify-between mt-1 pt-2 border-t border-amber-100">
+                  <span className="text-sm font-bold text-gray-900">실제 지급 예상</span>
+                  <span className="text-lg font-black text-gray-900">₩{computeConversion(maxConvertible).netAmount.toLocaleString()}</span>
+                </div>
               </div>
-              <div>
-                <p className="text-lg font-black text-gray-900">₩{cashWallet.pending.toLocaleString()}</p>
-                <p className="text-[11px] text-gray-400 mt-0.5">지급 대기</p>
-              </div>
-              <div>
-                <p className="text-lg font-black text-gray-900">₩{cashWallet.paidTotal.toLocaleString()}</p>
-                <p className="text-[11px] text-gray-400 mt-0.5">누적 지급</p>
-              </div>
-            </div>
-            <Button fullWidth variant="secondary" disabled={cashWallet.available === 0} onClick={() => setShowPayout(true)}>
+            ) : (
+              <p className="text-xs text-gray-400 mb-4">Reward Token이 {CASH_CONVERSION_UNIT}개 이상 모이면 전환할 수 있어요 (현재 {wallet.rewardBalance}개)</p>
+            )}
+            <Button fullWidth variant="secondary" disabled={maxConvertible === 0} onClick={openConvert}>
               카카오페이로 받기
             </Button>
-            <p className="text-[11px] text-gray-400 text-center mt-2">실제 서비스에서는 본인/보호자 확인 후 지급됩니다.</p>
           </div>
         </div>
 
@@ -140,6 +155,7 @@ export default function TokenPage() {
                 <span className="font-bold text-red-400">-{WEAKNESS_AI_SURCHARGE} 🪙</span>
               </div>
             </div>
+            <p className="text-[11px] text-gray-400 mt-2">충전 Token부터 사용됩니다.</p>
           </div>
         </div>
 
@@ -180,7 +196,9 @@ export default function TokenPage() {
                   )}
                   <div className="flex-1">
                     <p className="text-sm text-gray-700">{t.reason}</p>
-                    <p className="text-xs text-gray-400">{formatDateFull(t.createdAt)} · 잔액 {t.balanceAfter}🪙</p>
+                    <p className="text-xs text-gray-400">
+                      {formatDateFull(t.createdAt)} · {t.tokenSource === 'PURCHASED' ? '충전' : '리워드'} · 잔액 {t.balanceAfter}🪙
+                    </p>
                   </div>
                   <p className={`text-sm font-bold ${t.amount > 0 ? 'text-green-500' : 'text-red-400'}`}>
                     {t.amount > 0 ? '+' : ''}{t.amount}
@@ -213,9 +231,9 @@ export default function TokenPage() {
                 key={pkg.id}
                 label={pkg.label}
                 tokens={pkg.tokens}
-                bonus={pkg.bonus}
+                bonus={0}
                 price={pkg.price}
-                best={pkg.best}
+                best={'best' in pkg ? pkg.best : false}
                 selected={selectedPkg === pkg.id}
                 onClick={() => setSelectedPkg(pkg.id)}
               />
@@ -230,7 +248,7 @@ export default function TokenPage() {
         ) : product ? (
           <div className="space-y-4">
             <div className="bg-gray-50 rounded-2xl p-4 space-y-2">
-              <Row label="상품" value={`${product.label}${product.bonus ? ` (+${product.bonus} 보너스)` : ''}`} />
+              <Row label="상품" value={product.label} />
               <Row label="가격" value={`${product.price.toLocaleString()}원`} />
               <Row label="결제수단" value="카드 **** 1234 (Mock)" />
             </div>
@@ -267,7 +285,7 @@ export default function TokenPage() {
                   className={`w-full flex items-center justify-between p-3 rounded-2xl transition-colors ${selectedPkg === pkg.id ? 'bg-primary-50 border-2 border-primary-500' : 'bg-gray-50 border-2 border-transparent hover:bg-primary-50'}`}
                   onClick={() => setSelectedPkg(pkg.id)}
                 >
-                  <span className="font-semibold text-gray-800">🪙 {pkg.tokens + pkg.bonus} 토큰</span>
+                  <span className="font-semibold text-gray-800">🪙 {pkg.tokens} 토큰</span>
                   <span className="text-xs text-gray-400">{pkg.price.toLocaleString()}원</span>
                 </button>
               ))}
@@ -280,36 +298,69 @@ export default function TokenPage() {
         )}
       </BottomSheet>
 
-      <BottomSheet open={showPayout} onClose={closePayout} title="카카오페이로 Reward 받기">
-        {payoutState === 'confirm' && (
-          <div className="space-y-4">
+      <BottomSheet open={showConvert} onClose={closeConvert} title="몇 Token을 바꿀까요?">
+        {convertState === 'select' && (
+          <div className="space-y-5">
+            <div className="flex items-center justify-center gap-6">
+              <button
+                onClick={() => setConvertAmount((a) => Math.max(CASH_CONVERSION_UNIT, a - CASH_CONVERSION_UNIT))}
+                disabled={convertAmount <= CASH_CONVERSION_UNIT}
+                className="w-11 h-11 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 disabled:opacity-30"
+              >
+                <Minus size={18} />
+              </button>
+              <span className="text-3xl font-black text-gray-900 w-24 text-center">{convertAmount}</span>
+              <button
+                onClick={() => setConvertAmount((a) => Math.min(maxConvertible, a + CASH_CONVERSION_UNIT))}
+                disabled={convertAmount >= maxConvertible}
+                className="w-11 h-11 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 disabled:opacity-30"
+              >
+                <Plus size={18} />
+              </button>
+            </div>
+            <button onClick={() => setConvertAmount(maxConvertible)} className="w-full text-center text-xs font-bold text-primary-500">
+              MAX ({maxConvertible} TOKEN)
+            </button>
             <div className="bg-gray-50 rounded-2xl p-4 space-y-2">
-              <Row label="지급 금액" value={`₩${cashWallet.available.toLocaleString()}`} />
-              <Row label="받는 사람" value={student.name} />
-              <Row label="지급 방식" value="KakaoPay" />
+              <Row label="Token 가치" value={`₩${conversionPreview.grossAmount.toLocaleString()}`} />
+              <Row label={`수수료 ${Math.round(CASH_CONVERSION_FEE_RATE * 100)}%`} value={`-₩${conversionPreview.feeAmount.toLocaleString()}`} muted />
+              <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                <span className="text-sm font-bold text-gray-900">받는 금액</span>
+                <span className="text-lg font-black text-gray-900">₩{conversionPreview.netAmount.toLocaleString()}</span>
+              </div>
             </div>
-            <div className="p-3 bg-amber-50 rounded-2xl text-xs text-amber-700">
-              🔧 DEV MOCK — 실제 송금은 발생하지 않아요. 투자자 Demo용 화면입니다.
-            </div>
-            <Button fullWidth onClick={handleRequestPayout}>
-              지급 요청
+            <Button fullWidth onClick={handleConfirmConvert}>
+              ₩{conversionPreview.netAmount.toLocaleString()} 받기
             </Button>
           </div>
         )}
-        {payoutState === 'loading' && (
+        {convertState === 'loading' && (
           <div className="py-10 flex flex-col items-center gap-4">
             <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
             <p className="text-sm text-gray-500">지급을 처리하고 있어요...</p>
           </div>
         )}
-        {payoutState === 'done' && payoutResult && (
+        {convertState === 'done' && (
           <div className="py-6 text-center">
             <p className="text-4xl mb-3">✅</p>
-            <p className="font-bold text-gray-900 mb-1">지급이 완료되었습니다.</p>
-            <p className="text-3xl font-black text-gray-900 mt-3">₩{payoutResult.amount.toLocaleString()}</p>
-            <p className="text-sm text-gray-500 mt-1">KakaoPay 지급 완료</p>
-            <Button fullWidth className="mt-6" onClick={closePayout}>
+            <p className="font-bold text-gray-900 mb-1">카카오페이 지급 완료</p>
+            <p className="text-3xl font-black text-gray-900 mt-3">₩{convertedNet.toLocaleString()}</p>
+            <p className="text-xs text-gray-400 mt-3">사용 Reward Token {convertAmount}</p>
+            <p className="text-xs text-gray-400">
+              남은 Token {wallet.purchasedBalance} PURCHASED + {wallet.rewardBalance} REWARD = 총 {wallet.balance} TOKEN
+            </p>
+            <Button fullWidth className="mt-6" onClick={closeConvert}>
               확인
+            </Button>
+          </div>
+        )}
+        {convertState === 'fail' && (
+          <div className="py-6 text-center">
+            <p className="text-4xl mb-3">⚠️</p>
+            <p className="font-bold text-gray-900 mb-1">지급에 실패했어요.</p>
+            <p className="text-sm text-gray-500">Reward Token은 차감되지 않았습니다.</p>
+            <Button fullWidth className="mt-6" onClick={() => setConvertState('select')}>
+              다시 시도
             </Button>
           </div>
         )}
@@ -318,11 +369,11 @@ export default function TokenPage() {
   )
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value, muted = false }: { label: string; value: string; muted?: boolean }) {
   return (
     <div className="flex items-center justify-between">
       <span className="text-sm text-gray-500">{label}</span>
-      <span className="text-sm font-bold text-gray-900">{value}</span>
+      <span className={`text-sm font-bold ${muted ? 'text-red-400' : 'text-gray-900'}`}>{value}</span>
     </div>
   )
 }

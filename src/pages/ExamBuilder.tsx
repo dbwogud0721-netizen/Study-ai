@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MobileLayout } from '../components/layout/MobileLayout'
-import { PageHeader } from '../components/layout/PageHeader'
+import { AppHeader } from '../components/layout/AppHeader'
 import { Button } from '../components/ui/Button'
 import { TokenInsufficientSheet } from '../components/features/TokenInsufficientSheet'
 import { AdBanner } from '../components/ads/AdBanner'
@@ -10,10 +10,7 @@ import { useLocalStorage } from '../hooks/useLocalStorage'
 import { CORE_SUBJECTS, getCoreSubjectUnits } from '../config/curriculumConfig'
 import { UNIFIED_EXAM_TYPES, mapUnifiedExamType, UnifiedExamType } from '../config/examModeConfig'
 import { calculateExamTokenCost } from '../config/tokenConfig'
-import { getExamHistory } from '../services/examService'
-import { getTodayCashRewardCount } from '../services/cashRewardService'
-import { checkRewardEligibility } from '../services/rewardEligibility'
-import { recordTransaction } from '../services/tokenService'
+import { spendForExam } from '../services/tokenService'
 import { saveUser } from '../services/authService'
 import { StudentUser, ExamConfig, ExamType } from '../types'
 
@@ -86,20 +83,14 @@ export default function ExamBuilder() {
     }
   }, [student.schoolLevel, student.grade, examTypeId, currentSubject, subjectMeta.name, unitId, selectedUnit.name, difficulty, questionCount, targetScore, similarity])
 
-  const history = useMemo(() => getExamHistory(student.id), [student.id])
-  const eligibility = useMemo(
-    () => checkRewardEligibility({ config, history, todayCashRewardCount: getTodayCashRewardCount(student.id) }),
-    [config, history, student.id]
-  )
-
   const handleStart = () => {
     if (student.tokens < tokenCost) {
       setShowTokenSheet(true)
       return
     }
     setStarting(true)
-    const { balanceAfter } = recordTransaction(student.id, student.tokens, 'SPEND', tokenCost, `${subjectMeta.name} ${UNIFIED_EXAM_TYPES.find((t) => t.id === examTypeId)?.label} 응시`)
-    const updatedUser: StudentUser = { ...student, tokens: balanceAfter }
+    const wallet = spendForExam(student.id, tokenCost, `${subjectMeta.name} ${UNIFIED_EXAM_TYPES.find((t) => t.id === examTypeId)?.label} 응시`)
+    const updatedUser: StudentUser = { ...student, tokens: wallet.balance }
     saveUser(updatedUser)
     setUser(updatedUser)
 
@@ -110,7 +101,7 @@ export default function ExamBuilder() {
 
   return (
     <MobileLayout>
-      <PageHeader title="오늘의 시험" showBack={false} />
+      <AppHeader title="오늘의 시험" />
 
       <div className="flex-1 px-5 overflow-y-auto pb-8 space-y-6">
         <div>
@@ -244,12 +235,7 @@ export default function ExamBuilder() {
           <span className="text-gray-500">사용 Token</span>
           <span className="font-black text-amber-500">🪙 {tokenCost}</span>
         </div>
-        {eligibility.eligible && (
-          <div className="bg-amber-50 rounded-xl px-3 py-2 flex items-center justify-between">
-            <span className="text-xs font-bold text-amber-700">💸 CASH REWARD 획득 가능</span>
-            <span className="text-xs font-black text-amber-700">최대 ₩{eligibility.maxCashReward.toLocaleString()}</span>
-          </div>
-        )}
+        <p className="text-[11px] text-gray-400">충전 Token부터 사용됩니다.</p>
         <Button fullWidth size="lg" loading={starting} onClick={handleStart}>
           시험 시작
         </Button>

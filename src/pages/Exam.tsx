@@ -1,14 +1,13 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, Flag } from 'lucide-react'
+import { AlertTriangle, ChevronLeft, Flag } from 'lucide-react'
 import { MobileLayout } from '../components/layout/MobileLayout'
 import { Button } from '../components/ui/Button'
 import { BottomSheet } from '../components/ui/BottomSheet'
 import { useAppStore } from '../hooks/useAppStore'
 import { useExamTimer } from '../hooks/useExamTimer'
 import { buildExamResult } from '../services/examService'
-import { recordTransaction } from '../services/tokenService'
-import { recordCashReward } from '../services/cashRewardService'
+import { earnReward, earnBonus } from '../services/tokenService'
 import { saveUser } from '../services/authService'
 import { TARGET_SCORE_BONUS } from '../config/tokenConfig'
 import { StudentUser, QuestionAttempt } from '../types'
@@ -32,6 +31,8 @@ export default function Exam() {
   const [flaggedIds, setFlaggedIds] = useState<string[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
+  const [showExitConfirm, setShowExitConfirm] = useState(false)
+  const [showNavigator, setShowNavigator] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [startTime] = useState(Date.now())
   const [attemptTracker, setAttemptTracker] = useState<Record<string, AttemptTrack>>({})
@@ -113,23 +114,17 @@ export default function Exam() {
 
     const result = await buildExamResult(config, questions, answers, student.id, duration, flaggedIds, attempts)
 
-    const { balanceAfter: afterEarn } = recordTransaction(student.id, student.tokens, 'EARN', result.tokensEarned, `${config.subjectName} 시험 ${result.score}점 보상`)
-    let finalBalance = afterEarn
+    let wallet = earnReward(student.id, result.tokensEarned, `${config.subjectName} 시험 ${result.score}점 보상`)
     if (result.targetScoreMet && result.targetScoreBonusTokens) {
-      const { balanceAfter: afterBonus } = recordTransaction(
+      wallet = earnBonus(
         student.id,
-        afterEarn,
-        'BONUS',
         result.targetScoreBonusTokens,
         `목표 점수 ${result.targetScore}점 초과 달성 보너스 (₩${TARGET_SCORE_BONUS.won.toLocaleString()} 상당)`
       )
-      finalBalance = afterBonus
     }
-    const updatedUser: StudentUser = { ...student, tokens: finalBalance }
+    const updatedUser: StudentUser = { ...student, tokens: wallet.balance }
     setUser(updatedUser)
     saveUser(updatedUser)
-
-    recordCashReward(student.id, result.examId, result.cashRewardWon ?? 0, result.score)
 
     setCurrentExamResult(result)
     navigate('/result')
@@ -140,16 +135,19 @@ export default function Exam() {
   return (
     <MobileLayout className="bg-white">
       <div className="px-5 pt-12 pb-3 border-b border-gray-100">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-1">
+          <button onClick={() => setShowExitConfirm(true)} className="flex items-center gap-0.5 text-sm font-bold text-gray-500">
+            <ChevronLeft size={18} /> 나가기
+          </button>
           <span className="text-sm font-bold text-primary-500">{config.subjectName}</span>
           <button onClick={toggleFlag} className={isFlagged ? 'text-amber-500' : 'text-gray-300'}>
             <Flag size={20} fill={isFlagged ? 'currentColor' : 'none'} />
           </button>
         </div>
-        <span className="text-2xl font-black text-gray-900">
+        <button onClick={() => setShowNavigator(true)} className="text-2xl font-black text-gray-900">
           {currentIndex + 1}
           <span className="text-base font-medium text-gray-400"> / {questions.length}</span>
-        </span>
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
@@ -242,6 +240,51 @@ export default function Exam() {
           </Button>
           <Button variant="primary" className="flex-1" loading={submitting} onClick={handleSubmit}>
             제출하기
+          </Button>
+        </div>
+      </BottomSheet>
+
+      <BottomSheet open={showNavigator} onClose={() => setShowNavigator(false)} title="문제 번호">
+        <div className="grid grid-cols-5 gap-2 mb-4">
+          {questions.map((qq, i) => {
+            const answered = answers[qq.questionId] !== undefined
+            const flagged = flaggedIds.includes(qq.questionId)
+            const isCurrent = i === currentIndex
+            return (
+              <button
+                key={qq.questionId}
+                onClick={() => { goToIndex(i); setShowNavigator(false) }}
+                className={`aspect-square rounded-xl flex items-center justify-center text-sm font-bold transition-all ${
+                  isCurrent
+                    ? 'border-2 border-primary-600 bg-primary-50 text-primary-700'
+                    : flagged
+                      ? 'bg-amber-100 text-amber-700'
+                      : answered
+                        ? 'bg-primary-500 text-white'
+                        : 'bg-gray-100 text-gray-400'
+                }`}
+              >
+                {i + 1}
+              </button>
+            )
+          })}
+        </div>
+        <div className="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-primary-500 inline-block" /> 답변 완료</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded border-2 border-primary-600 inline-block" /> 현재 문제</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-gray-100 inline-block" /> 미답변</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-100 inline-block" /> 검토 표시</span>
+        </div>
+      </BottomSheet>
+
+      <BottomSheet open={showExitConfirm} onClose={() => setShowExitConfirm(false)} title="시험을 나갈까요?">
+        <p className="text-sm text-gray-600 mb-4">현재까지의 답안은 임시 저장됩니다.</p>
+        <div className="flex gap-2">
+          <Button variant="secondary" className="flex-1" onClick={() => setShowExitConfirm(false)}>
+            계속 풀기
+          </Button>
+          <Button variant="danger" className="flex-1" onClick={() => navigate('/home')}>
+            시험 나가기
           </Button>
         </div>
       </BottomSheet>

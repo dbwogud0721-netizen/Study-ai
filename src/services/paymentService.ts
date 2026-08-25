@@ -1,6 +1,6 @@
 import { TokenPurchaseRequest, StudentUser } from '../types'
-import { TOKEN_PACKAGES } from '../config/tokenConfig'
-import { recordTransaction } from './tokenService'
+import { TOKEN_PACKAGES } from '../config/tokenEconomyConfig'
+import { purchaseTokens } from './tokenService'
 import { MOCK_PARENT } from '../data/mockUsers'
 
 const STORAGE_KEY = 'studyai_payment_requests'
@@ -40,7 +40,7 @@ export function requestTokenPurchase(student: StudentUser, productId: string): T
     studentId: student.id,
     studentName: student.name,
     productId,
-    tokens: product.tokens + product.bonus,
+    tokens: product.tokens,
     price: product.price,
     status: 'pending',
     createdAt: new Date().toISOString(),
@@ -69,20 +69,15 @@ export function approveRequest(requestId: string): TokenPurchaseRequest | null {
   return all[idx]
 }
 
-// Mock 결제 성공 후에만 실제로 토큰을 지급하고 거래를 기록한다.
-export function confirmMockPayment(requestId: string, studentCurrentTokens: number): { balanceAfter: number } | null {
+// Mock 결제 성공 후에만 실제로 토큰을 지급하고 거래를 기록한다. 보호자가 결제한
+// 토큰은 항상 PURCHASED_TOKEN(현금 전환 불가)으로 기록된다.
+export function confirmMockPayment(requestId: string): { balanceAfter: number } | null {
   const all = getAll()
   const idx = all.findIndex((r) => r.id === requestId)
   if (idx === -1) return null
   const req = all[idx]
-  const { balanceAfter } = recordTransaction(
-    req.studentId,
-    studentCurrentTokens,
-    'PURCHASE',
-    req.tokens,
-    `토큰 충전 ${req.tokens} TOKEN (보호자 결제)`
-  )
+  const wallet = purchaseTokens(req.studentId, req.tokens, `토큰 충전 ${req.tokens} TOKEN (보호자 결제)`)
   all[idx] = { ...req, status: 'paid' }
   saveAll(all)
-  return { balanceAfter }
+  return { balanceAfter: wallet.balance }
 }

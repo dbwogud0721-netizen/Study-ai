@@ -1,9 +1,13 @@
-export type TokenTransactionType = 'EARN' | 'SPEND' | 'PURCHASE' | 'REFUND' | 'BONUS'
+export type TokenTransactionType = 'EARN' | 'SPEND' | 'PURCHASE' | 'REFUND' | 'BONUS' | 'CONVERT'
+
+/** PURCHASED = 현금으로 구매한 토큰(현금 전환 불가). REWARD = 시험 성적으로 번 토큰(현금 전환 가능). */
+export type TokenSource = 'PURCHASED' | 'REWARD'
 
 export interface TokenTransaction {
   id: string
   userId: string
   type: TokenTransactionType
+  tokenSource: TokenSource
   amount: number
   reason: string
   createdAt: string
@@ -12,8 +16,9 @@ export interface TokenTransaction {
 
 export interface TokenWallet {
   balance: number
+  purchasedBalance: number
+  rewardBalance: number
   earned: number
-  purchased: number
   spent: number
 }
 

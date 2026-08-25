@@ -1,5 +1,5 @@
 import { MobileLayout } from '../components/layout/MobileLayout'
-import { PageHeader } from '../components/layout/PageHeader'
+import { AppHeader } from '../components/layout/AppHeader'
 import { useAppStore } from '../hooks/useAppStore'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { StudentUser } from '../types'
@@ -39,7 +39,7 @@ export default function NotificationSettings() {
 
   return (
     <MobileLayout>
-      <PageHeader title="알림 설정" />
+      <AppHeader title="알림 설정" />
 
       <div className="flex-1 px-5 pb-8">
         <div className="bg-white rounded-card divide-y divide-gray-50">

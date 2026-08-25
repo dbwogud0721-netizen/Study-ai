@@ -2,11 +2,11 @@ import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Check, PartyPopper } from 'lucide-react'
 import { MobileLayout } from '../components/layout/MobileLayout'
-import { PageHeader } from '../components/layout/PageHeader'
+import { AppHeader } from '../components/layout/AppHeader'
 import { Button } from '../components/ui/Button'
 import { getRequestById, confirmMockPayment } from '../services/paymentService'
 import { getUserById, saveUser } from '../services/authService'
-import { TOKEN_PACKAGES } from '../config/tokenConfig'
+import { TOKEN_PACKAGES } from '../config/tokenEconomyConfig'
 import { StudentUser } from '../types'
 
 export default function PaymentConfirm() {
@@ -22,7 +22,7 @@ export default function PaymentConfirm() {
   if (!request) {
     return (
       <MobileLayout>
-        <PageHeader title="결제 확인" />
+        <AppHeader title="결제 확인" />
         <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">요청을 찾을 수 없어요</div>
       </MobileLayout>
     )
@@ -31,9 +31,8 @@ export default function PaymentConfirm() {
   const handlePay = async () => {
     setPaying(true)
     const studentUser = getUserById(request.studentId) as StudentUser | null
-    const currentTokens = studentUser?.tokens ?? 0
     await new Promise((r) => setTimeout(r, 900))
-    const result = confirmMockPayment(request.id, currentTokens)
+    const result = confirmMockPayment(request.id)
     if (result && studentUser) {
       saveUser({ ...studentUser, tokens: result.balanceAfter })
     }
@@ -58,10 +57,10 @@ export default function PaymentConfirm() {
 
   return (
     <MobileLayout>
-      <PageHeader title="결제 확인" />
+      <AppHeader title="결제 확인" />
       <div className="flex-1 px-5 pb-8">
         <div className="bg-white rounded-card p-5 space-y-3 mt-2">
-          <Row label="상품" value={`${pkg?.label ?? `${request.tokens} TOKEN`}${pkg?.bonus ? ` (+${pkg.bonus} 보너스)` : ''}`} />
+          <Row label="상품" value={pkg?.label ?? `${request.tokens} TOKEN`} />
           <Row label="가격" value={`${request.price.toLocaleString()}원`} />
           <Row label="결제 대상" value={request.studentName} />
           <Row label="결제수단" value="카드 **** 1234 (Mock)" />

@@ -1,9 +1,10 @@
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Home, BookOpen, BarChart2, User } from 'lucide-react'
+import { Home, BookOpen, Coins, BarChart2, User } from 'lucide-react'
 
 const NAV_ITEMS = [
   { path: '/home', label: '홈', icon: Home },
   { path: '/exam/new', label: '시험', icon: BookOpen },
+  { path: '/tokens', label: '토큰', icon: Coins },
   { path: '/grades', label: '성적', icon: BarChart2 },
   { path: '/my', label: 'MY', icon: User },
 ]

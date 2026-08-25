@@ -80,8 +80,6 @@ export interface ExamResult {
   targetScore?: number
   targetScoreMet?: boolean
   targetScoreBonusTokens?: number
-  /** 현금 Reward(₩) — 0이면 이번 시험은 Reward 대상이 아니었거나 기준 미달 */
-  cashRewardWon?: number
 }
 
 export interface ConceptAnalysis {

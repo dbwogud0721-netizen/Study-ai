@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { CheckCircle2, Copy, Unlink } from 'lucide-react'
 import { MobileLayout } from '../components/layout/MobileLayout'
-import { PageHeader } from '../components/layout/PageHeader'
+import { AppHeader } from '../components/layout/AppHeader'
 import { Button } from '../components/ui/Button'
 import { useAppStore } from '../hooks/useAppStore'
 import { getUserById, linkParent, unlinkParent } from '../services/authService'
@@ -43,7 +43,7 @@ export default function ParentLink() {
 
   return (
     <MobileLayout>
-      <PageHeader title="보호자 연결" />
+      <AppHeader title="보호자 연결" />
 
       <div className="flex-1 px-5 pb-8">
         {parent ? (

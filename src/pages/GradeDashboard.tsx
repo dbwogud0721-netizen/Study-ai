@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { BarChart2, Target, Trophy, ListChecks, Timer, TrendingUp } from 'lucide-react'
 import { MobileLayout } from '../components/layout/MobileLayout'
 import { BottomNav } from '../components/layout/BottomNav'
+import { AppHeader } from '../components/layout/AppHeader'
 import { AdBanner } from '../components/ads/AdBanner'
 import { StatCard } from '../components/ui/StatCard'
 import { ProgressBar } from '../components/ui/ProgressBar'
@@ -14,7 +15,7 @@ import { PositionHeatmap } from '../components/features/PositionHeatmap'
 import { useAppStore } from '../hooks/useAppStore'
 import { getSubjectTaxonomy } from '../config/curriculumConfig'
 import { getExamHistory } from '../services/examService'
-import { recordTransaction } from '../services/tokenService'
+import { spendForExam } from '../services/tokenService'
 import { saveUser } from '../services/authService'
 import {
   calculateOverallScore,
@@ -139,8 +140,8 @@ export default function GradeDashboard() {
       questionCount: recommended.totalQuestions,
       timeLimitMinutes: recommended.estimatedMinutes,
     }
-    const { balanceAfter } = recordTransaction(student.id, student.tokens, 'SPEND', recommended.tokenCost, `${recommended.title} 응시`)
-    const updatedUser: StudentUser = { ...student, tokens: balanceAfter }
+    const wallet = spendForExam(student.id, recommended.tokenCost, `${recommended.title} 응시`)
+    const updatedUser: StudentUser = { ...student, tokens: wallet.balance }
     saveUser(updatedUser)
     setUser(updatedUser)
     setPendingExamConfig(config)
@@ -151,6 +152,7 @@ export default function GradeDashboard() {
   if (allHistory.length === 0) {
     return (
       <MobileLayout>
+        <AppHeader title="성적 분석" />
         <div className="flex-1 flex flex-col items-center justify-center px-8 text-center gap-2">
           <p className="text-lg font-black text-gray-900">아직 응시한 시험이 없어요</p>
           <p className="text-sm text-gray-500">모의고사를 풀면 성적 분석이 여기에 쌓여요</p>
@@ -162,11 +164,8 @@ export default function GradeDashboard() {
 
   return (
     <MobileLayout>
+      <AppHeader title="성적 분석" subtitle="나의 학습 성장을 한눈에" />
       <div className="flex-1 overflow-y-auto pb-24">
-        <div className="bg-white px-5 pt-12 pb-4">
-          <h1 className="text-2xl font-black text-gray-900">성적 대시보드</h1>
-          <p className="text-sm text-gray-500 mt-1">나의 학습 성장을 한눈에</p>
-        </div>
 
         {subjects.length > 1 && (
           <div className="px-5 mt-2 flex gap-2 overflow-x-auto">

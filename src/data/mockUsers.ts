@@ -1,5 +1,6 @@
 import { StudentUser, ParentUser } from '../types'
-import { INITIAL_TOKENS, TOKEN_PACKAGES } from '../config/tokenConfig'
+import { INITIAL_TOKENS } from '../config/tokenConfig'
+import { TOKEN_PACKAGES } from '../config/tokenEconomyConfig'
 import { CURRENT_CURRICULUM_VERSION, getExamSystemVersion } from '../config/curriculumConfig'
 
 const studentEntryYear = 2027
@@ -40,7 +41,7 @@ export const MOCK_PARENT: ParentUser = {
       studentId: 'student_001',
       studentName: '박인성',
       productId: TOKEN_PACKAGES[1].id,
-      tokens: TOKEN_PACKAGES[1].tokens + TOKEN_PACKAGES[1].bonus,
+      tokens: TOKEN_PACKAGES[1].tokens,
       price: TOKEN_PACKAGES[1].price,
       status: 'pending',
       createdAt: new Date().toISOString(),

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { MobileLayout } from '../components/layout/MobileLayout'
-import { PageHeader } from '../components/layout/PageHeader'
+import { AppHeader } from '../components/layout/AppHeader'
 
 const FAQS: { q: string; a: string }[] = [
   { q: '토큰은 어떻게 얻나요?', a: '시험을 응시해 점수를 받으면 점수 구간에 따라 토큰을 받아요. 연속 학습 보너스, 보호자 충전, 목표 점수 초과 달성 보너스로도 얻을 수 있어요.' },
@@ -16,7 +16,7 @@ export default function Help() {
 
   return (
     <MobileLayout>
-      <PageHeader title="도움말" />
+      <AppHeader title="도움말" />
 
       <div className="flex-1 px-5 pb-8 overflow-y-auto">
         <div className="bg-white rounded-card divide-y divide-gray-50">

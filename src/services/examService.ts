@@ -3,9 +3,6 @@ import { analyzeWeakness } from './aiService'
 import { calculateReward } from './tokenService'
 import { buildMockKoreanHistory } from '../data/mockAttemptHistory'
 import { TARGET_SCORE_BONUS } from '../config/tokenConfig'
-import { checkRewardEligibility } from './rewardEligibility'
-import { getTodayCashRewardCount } from './cashRewardService'
-import { getCashRewardForScore } from '../config/cashRewardConfig'
 
 const STORAGE_KEY = 'studyai_exam_history'
 
@@ -31,10 +28,6 @@ export async function buildExamResult(
   const targetScoreMet = config.targetScore !== undefined && score > config.targetScore
   const targetScoreBonusTokens = targetScoreMet ? TARGET_SCORE_BONUS.tokens : 0
 
-  const priorHistory = getExamHistory(userId)
-  const eligibility = checkRewardEligibility({ config, history: priorHistory, todayCashRewardCount: getTodayCashRewardCount(userId) })
-  const cashRewardWon = eligibility.eligible ? getCashRewardForScore(score) : 0
-
   const result: ExamResult = {
     examId,
     userId,
@@ -57,7 +50,6 @@ export async function buildExamResult(
     targetScore: config.targetScore,
     targetScoreMet,
     targetScoreBonusTokens,
-    cashRewardWon,
   }
 
   saveExamResult(result)

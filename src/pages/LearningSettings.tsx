@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Check } from 'lucide-react'
 import { MobileLayout } from '../components/layout/MobileLayout'
-import { PageHeader } from '../components/layout/PageHeader'
+import { AppHeader } from '../components/layout/AppHeader'
 import { Button } from '../components/ui/Button'
 import { useAppStore } from '../hooks/useAppStore'
 import { getCurriculumSubjects } from '../config/curriculumConfig'
@@ -48,7 +48,7 @@ export default function LearningSettings() {
 
   return (
     <MobileLayout>
-      <PageHeader title="학습 설정" subtitle="학년이 바뀌면 시험·과목 범위도 새 학년 기준으로 바뀌어요" />
+      <AppHeader title="학습 설정" subtitle="학년이 바뀌면 시험·과목 범위도 새 학년 기준으로 바뀌어요" />
 
       <div className="flex-1 px-5 overflow-y-auto pb-8 space-y-6">
         {changed && (

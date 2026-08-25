@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Lightbulb, RefreshCw, X, CheckCircle, XCircle } from 'lucide-react'
 import { MobileLayout } from '../components/layout/MobileLayout'
-import { PageHeader } from '../components/layout/PageHeader'
+import { AppHeader } from '../components/layout/AppHeader'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { BottomSheet } from '../components/ui/BottomSheet'
@@ -46,7 +46,7 @@ export default function WrongAnswerAnalysis() {
 
   return (
     <MobileLayout>
-      <PageHeader title="오답 분석" subtitle={`${q.subject} · ${q.unit}`} />
+      <AppHeader title="오답 분석" subtitle={`${q.subject} · ${q.unit}`} />
 
       <div className="flex-1 overflow-y-auto px-5 space-y-4 pb-32">
         {/* 내 답 vs 정답 */}

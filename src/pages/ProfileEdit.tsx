@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MobileLayout } from '../components/layout/MobileLayout'
-import { PageHeader } from '../components/layout/PageHeader'
+import { AppHeader } from '../components/layout/AppHeader'
 import { Button } from '../components/ui/Button'
 import { useAppStore } from '../hooks/useAppStore'
 import { updateProfile } from '../services/authService'
@@ -24,7 +24,7 @@ export default function ProfileEdit() {
 
   return (
     <MobileLayout>
-      <PageHeader title="프로필 수정" />
+      <AppHeader title="프로필 수정" />
 
       <div className="flex-1 px-5 pb-8 space-y-6">
         <div className="flex flex-col items-center pt-4">

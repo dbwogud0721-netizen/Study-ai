@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, Sparkles } from 'lucide-react'
 import { MobileLayout } from '../components/layout/MobileLayout'
-import { PageHeader } from '../components/layout/PageHeader'
+import { AppHeader } from '../components/layout/AppHeader'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { ProgressBar } from '../components/ui/ProgressBar'
@@ -75,7 +75,7 @@ export default function ProblemMaker() {
 
   return (
     <MobileLayout>
-      <PageHeader title="AI 문제 생성" onBack={step === 'home' ? undefined : handleBack} />
+      <AppHeader title="AI 문제 생성" onBack={step === 'home' ? undefined : handleBack} />
 
       <div className="flex-1 px-5 pb-8 overflow-y-auto">
         {/* 1. 초기 화면 — 생성 가능한 과목만 활성화 */}
