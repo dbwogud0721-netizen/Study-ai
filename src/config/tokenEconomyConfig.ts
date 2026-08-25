@@ -11,7 +11,7 @@ export const TOKEN_PACKAGES = [
 ] as const
 
 export const CASH_CONVERSION_FEE_RATE = 0.1
-export const CASH_CONVERSION_UNIT = 10
+export const CASH_CONVERSION_UNIT = 1
 
 export interface ConversionBreakdown {
   grossAmount: number

@@ -40,20 +40,20 @@ describe('computeConversion', () => {
 })
 
 describe('getMaxConvertibleTokens', () => {
-  it('57 Reward Token -> 최대 전환 가능 50, 남은 Reward Token 7', () => {
+  it('57 Reward Token -> 1개 단위이므로 그대로 57 전액 전환 가능', () => {
     const max = getMaxConvertibleTokens(57)
-    expect(max).toBe(50)
-    expect(57 - max).toBe(7)
+    expect(max).toBe(57)
+    expect(57 - max).toBe(0)
   })
 })
 
 describe('deriveWallet + getMaxConvertibleTokens (지갑 구성, 구매+리워드 합산 전환)', () => {
-  it('22 Purchased + 50 Reward -> 총 Token 72, 현금 전환 가능 Token 70', () => {
+  it('22 Purchased + 50 Reward -> 총 Token 72, 현금 전환 가능 Token 72', () => {
     const wallet = deriveWallet([tx('PURCHASED', 22), tx('REWARD', 50)])
     expect(wallet.balance).toBe(72)
     expect(wallet.purchasedBalance).toBe(22)
     expect(wallet.rewardBalance).toBe(50)
-    expect(getMaxConvertibleTokens(wallet.balance)).toBe(70)
+    expect(getMaxConvertibleTokens(wallet.balance)).toBe(72)
   })
 
   it('Purchased Token만 50 -> 현금 전환 가능 Token 50 (구매 Token도 전환 대상)', () => {
