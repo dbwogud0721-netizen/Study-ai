@@ -85,11 +85,11 @@ export default function MyPage() {
         {/* 메뉴 */}
         <div className="px-5 mt-4">
           <div className="bg-white rounded-3xl overflow-hidden">
-            <MenuItem icon={<User size={18} />} label="프로필 수정" onClick={() => alert('준비 중')} />
-            <MenuItem icon={<BookOpen size={18} />} label="학습 설정" onClick={() => alert('준비 중')} />
-            <MenuItem icon={<Bell size={18} />} label="알림 설정" onClick={() => alert('준비 중')} />
-            <MenuItem icon={<Shield size={18} />} label="보호자 연결" onClick={() => navigate('/parent')} />
-            <MenuItem icon={<HelpCircle size={18} />} label="도움말" onClick={() => alert('준비 중')} />
+            <MenuItem icon={<User size={18} />} label="프로필 수정" onClick={() => navigate('/my/profile')} />
+            <MenuItem icon={<BookOpen size={18} />} label="학습 설정" onClick={() => navigate('/my/settings')} />
+            <MenuItem icon={<Bell size={18} />} label="알림 설정" onClick={() => navigate('/my/notifications')} />
+            <MenuItem icon={<Shield size={18} />} label="보호자 연결" onClick={() => navigate('/my/parent-link')} />
+            <MenuItem icon={<HelpCircle size={18} />} label="도움말" onClick={() => navigate('/my/help')} />
           </div>
         </div>
 

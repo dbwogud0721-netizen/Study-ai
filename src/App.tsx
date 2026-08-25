@@ -17,6 +17,11 @@ import WrongAnswerAnalysis from './pages/WrongAnswerAnalysis'
 import GradeDashboard from './pages/GradeDashboard'
 import TokenPage from './pages/TokenPage'
 import MyPage from './pages/MyPage'
+import ProfileEdit from './pages/ProfileEdit'
+import LearningSettings from './pages/LearningSettings'
+import NotificationSettings from './pages/NotificationSettings'
+import ParentLink from './pages/ParentLink'
+import Help from './pages/Help'
 import ParentDashboard from './pages/ParentDashboard'
 import PaymentConfirm from './pages/PaymentConfirm'
 import AILearn from './pages/AILearn'
@@ -86,6 +91,11 @@ export default function App() {
         <Route path="/grades" element={<RequireStudent><GradeDashboard /></RequireStudent>} />
         <Route path="/tokens" element={<RequireStudent><TokenPage /></RequireStudent>} />
         <Route path="/my" element={<RequireStudent><MyPage /></RequireStudent>} />
+        <Route path="/my/profile" element={<RequireStudent><ProfileEdit /></RequireStudent>} />
+        <Route path="/my/settings" element={<RequireStudent><LearningSettings /></RequireStudent>} />
+        <Route path="/my/notifications" element={<RequireStudent><NotificationSettings /></RequireStudent>} />
+        <Route path="/my/parent-link" element={<RequireStudent><ParentLink /></RequireStudent>} />
+        <Route path="/my/help" element={<RequireStudent><Help /></RequireStudent>} />
         <Route path="/ai-learn" element={<RequireStudent><AILearn /></RequireStudent>} />
         <Route path="/problem-maker" element={<RequireStudent><ProblemMaker /></RequireStudent>} />
 

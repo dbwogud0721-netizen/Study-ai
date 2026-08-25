@@ -71,18 +71,20 @@ export async function generateExamBlueprint(
     return generateRecommendedExamFromHistory(weaknessSource.attempts, weaknessSource.questions, config.subjectName, config.questionCount)
   }
 
-  // 전체 모의고사: 과목별 고정 구성(예: 국어 독서17/문학17/언어와매체11)
+  // 전체 모의고사: 실제 수능과 동일한 문항수·시간이 고정값이다(임의 선택 불가).
+  // 과목별 세부 영역 구성이 등록돼 있으면 그걸 쓰고, 없으면 문항수/시간만 고정한 채 균등 배분한다.
   if (config.examType === 'FULL_MOCK') {
     const full = getFullMockBlueprint(config.subjectName)
-    if (full) {
-      return {
-        title: `${config.subjectName} 전체 모의고사`,
-        examModeLabel: modeDef?.label ?? '전체 모의고사',
-        totalQuestions: full.totalQuestions,
-        distribution: full.distribution,
-        estimatedMinutes: full.timeLimitMinutes,
-        tokenCost,
-      }
+    const totalQuestions = full?.totalQuestions ?? config.questionCount
+    const estimatedMinutes = full?.timeLimitMinutes ?? config.timeLimitMinutes
+    return {
+      title: `${config.subjectName} 전체 모의고사`,
+      examModeLabel: modeDef?.label ?? '전체 모의고사',
+      totalQuestions,
+      distribution: full?.distribution ?? buildBalancedDistribution(topicPool, totalQuestions),
+      estimatedMinutes,
+      tokenCost,
+      rationale: '실제 수능과 동일한 문항수·시간으로 구성했어요',
     }
   }
 
@@ -132,7 +134,7 @@ export async function generateExam(config: ExamConfig, blueprint?: ExamBlueprint
   const basePool = subjectPool.length > 0 ? subjectPool : MOCK_QUESTIONS
 
   if (!blueprint) {
-    return assignPositions(shuffle(basePool).slice(0, config.questionCount))
+    return finalizeQuestions(shuffle(basePool).slice(0, config.questionCount))
   }
 
   const picked: Question[] = []
@@ -175,11 +177,39 @@ export async function generateExam(config: ExamConfig, blueprint?: ExamBlueprint
     picked.push({ ...src, questionId: `${src.questionId}_dup${dupCount}` })
   }
 
-  return assignPositions(shuffle(picked).slice(0, config.questionCount))
+  return finalizeQuestions(shuffle(picked).slice(0, config.questionCount))
 }
 
-function assignPositions(questions: Question[]): Question[] {
-  return questions.map((q, i) => ({ ...q, questionPosition: i + 1 }))
+// TEMP(테스트용, 나중에 지울 것): 토큰 보상 흐름을 빠르게 확인할 수 있도록
+// 생성되는 모든 문제의 정답을 1번(인덱스 0)으로 강제한다.
+const DEBUG_FORCE_FIRST_CHOICE_CORRECT = true
+
+// 실제 수능/모의고사와 동일하게 5지선다로 통일한다. 원본 문제가 4개뿐이면
+// 같은 과목의 다른 문제에서 오답 하나를 빌려와 5번째 선택지로 채운다.
+function ensureFiveChoices(questions: Question[]): Question[] {
+  return questions.map((q) => {
+    if (q.choices.length >= 5) return q
+    const existing = new Set(q.choices)
+    const candidates = shuffle(MOCK_QUESTIONS.filter((other) => other.subject === q.subject && other.questionId !== q.questionId))
+
+    let extra: string | undefined
+    for (const other of candidates) {
+      const wrongChoices = other.choices.filter((_, i) => i !== other.correctAnswer)
+      const found = wrongChoices.find((c) => !existing.has(c))
+      if (found) { extra = found; break }
+    }
+    if (!extra) extra = `${q.choices[q.choices.length - 1]} (유사 오답)`
+
+    return { ...q, choices: [...q.choices, extra] }
+  })
+}
+
+function finalizeQuestions(questions: Question[]): Question[] {
+  return ensureFiveChoices(questions).map((q, i) => ({
+    ...q,
+    questionPosition: i + 1,
+    correctAnswer: DEBUG_FORCE_FIRST_CHOICE_CORRECT ? 0 : q.correctAnswer,
+  }))
 }
 
 function shuffle<T>(arr: T[]): T[] {

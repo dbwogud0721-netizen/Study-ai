@@ -11,9 +11,9 @@ export const TOKEN_COSTS: Record<string, number> = {
 }
 
 export const TOKEN_REWARDS = {
-  score_90_plus: 5,
-  score_80_89: 3,
-  score_70_79: 2,
+  score_90_plus: 10,
+  score_80_89: 5,
+  score_70_79: 1,
   score_below_70: 1,
   streak_7day: 2,
   streak_30day: 5,
@@ -21,6 +21,10 @@ export const TOKEN_REWARDS = {
 } as const
 
 export const FREE_DAILY_QUESTIONS = 5
+
+// 목표 점수 초과 달성 보너스. 토큰 수는 가장 저렴한 패키지(pkg_10 = 1,000원/10토큰) 기준
+// 환산가로 산정한다: 5,000원 ÷ 100원/토큰 = 50 TOKEN.
+export const TARGET_SCORE_BONUS = { won: 5000, tokens: 50 } as const
 
 export const TOKEN_PACKAGES = [
   { id: 'pkg_10', tokens: 10, price: 1000, label: '10 토큰', bonus: 0, best: false },

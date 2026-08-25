@@ -5,6 +5,7 @@ import { Button } from '../components/ui/Button'
 import { ProgressBar } from '../components/ui/ProgressBar'
 import { useAppStore } from '../hooks/useAppStore'
 import { scoreColor } from '../utils/formatters'
+import { TARGET_SCORE_BONUS } from '../config/tokenConfig'
 
 export default function ExamResult() {
   const navigate = useNavigate()
@@ -49,6 +50,17 @@ export default function ExamResult() {
               <p className="text-2xl font-black">+{r.tokensEarned} TOKEN</p>
             </div>
           </div>
+
+          {/* 목표 점수 달성 보너스 */}
+          {r.targetScore !== undefined && (
+            <div className={`mt-3 mx-auto max-w-[300px] rounded-2xl px-4 py-3 text-sm font-bold ${r.targetScoreMet ? 'bg-amber-400/90 text-amber-950' : 'bg-white/10 text-white/70'}`}>
+              {r.targetScoreMet ? (
+                <>🎉 목표 {r.targetScore}점 초과 달성! 보너스 +{r.targetScoreBonusTokens} TOKEN (₩{TARGET_SCORE_BONUS.won.toLocaleString()} 상당)</>
+              ) : (
+                <>목표 {r.targetScore}점엔 못 미쳤어요. 다음엔 초과 달성해서 보너스 🪙 {TARGET_SCORE_BONUS.tokens} TOKEN 받아봐요</>
+              )}
+            </div>
+          )}
         </div>
 
         {/* 정오답 통계 */}

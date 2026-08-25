@@ -7,12 +7,13 @@ import { Button } from '../components/ui/Button'
 import { TokenInsufficientSheet } from '../components/features/TokenInsufficientSheet'
 import { useAppStore } from '../hooks/useAppStore'
 import { getExamModes, getExamModeDef } from '../config/examModeConfig'
-import { getCurriculumSubjects, getUnits, getExamAreas, DIFFICULTIES, getSubjectTaxonomy, getAreaMockDefaults } from '../config/curriculumConfig'
+import { getCurriculumSubjects, getUnits, getExamAreas, DIFFICULTIES, getSubjectTaxonomy, getAreaMockDefaults, getOfficialMockSpec } from '../config/curriculumConfig'
 import { estimateMinutesForCount } from '../data/examBlueprints/koreanCsat'
 import { generateExamBlueprint } from '../services/aiService'
 import { getExamHistory } from '../services/examService'
 import { recordTransaction } from '../services/tokenService'
 import { saveUser } from '../services/authService'
+import { TARGET_SCORE_BONUS } from '../config/tokenConfig'
 import { StudentUser, ExamConfig, ExamMode, ExamBlueprint, ExamType, Question, QuestionAttempt } from '../types'
 
 type Step = 'mode' | 'subject' | 'area_choice' | 'area_major' | 'area_middle' | 'semester' | 'unit' | 'settings' | 'preview'
@@ -40,6 +41,7 @@ export default function ExamBuilder() {
   const [questionCount, setQuestionCount] = useState(20)
   const [timeLimitMinutes, setTimeLimitMinutes] = useState(40)
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard' | 'mixed'>('mixed')
+  const [targetScore, setTargetScore] = useState<number | undefined>(undefined)
 
   // 영역별/AI 취약영역 흐름(섹션 1/24/25)에서만 쓰는 상태
   const [areaChoice, setAreaChoice] = useState<AreaChoice>(null)
@@ -63,10 +65,13 @@ export default function ExamBuilder() {
   // state가 아니라 방금 고른 mode 값으로 직접 스텝 순서를 계산해야 한다.
   function stepsForMode(mode: ExamMode): Step[] {
     const s: Step[] = ['mode']
-    if (mode !== 'weakness_ai' && mode !== 'mock_full') s.push('subject')
+    if (mode !== 'weakness_ai') s.push('subject')
     if (mode === 'school_prep') s.push('semester')
     if (mode === 'unit_focus' || mode === 'school_prep') s.push('unit')
-    s.push('settings', 'preview')
+    // 모의고사 계열(mock_full/mock_subject)은 실제 시험과 동일한 문항수·시간이 고정값이라
+    // 문제 수를 고르는 settings 스텝 자체를 건너뛴다.
+    if (mode !== 'mock_full' && mode !== 'mock_subject') s.push('settings')
+    s.push('preview')
     return s
   }
 
@@ -107,10 +112,10 @@ export default function ExamBuilder() {
   }, [subjectId, examMode, student.schoolLevel, grade, needsSemester, semester])
 
   const countPresets = useMemo(() => {
-    if (!modeDef) return [10, 20, 30]
+    if (!modeDef) return [5, 10, 20, 30]
     if (modeDef.defaultQuestionCount <= 10) return [5, 10, 15]
-    if (modeDef.defaultQuestionCount >= 30) return [20, 30, 40]
-    return [10, 20, 30]
+    if (modeDef.defaultQuestionCount >= 30) return [5, 20, 30, 40]
+    return [5, 10, 20, 30]
   }, [modeDef])
 
   function applyMode(m: ExamMode) {
@@ -124,6 +129,7 @@ export default function ExamBuilder() {
     setAreaChoice(null)
     setTargetMajorAreaId('')
     setTargetMajorAreaName('')
+    setTargetScore(undefined)
     if (def) {
       setQuestionCount(def.defaultQuestionCount)
       setTimeLimitMinutes(def.defaultTimeLimitMinutes)
@@ -167,6 +173,7 @@ export default function ExamBuilder() {
       difficulty,
       questionCount,
       timeLimitMinutes,
+      targetScore,
       ...overrides,
     }
   }
@@ -287,6 +294,17 @@ export default function ExamBuilder() {
                     const taxonomy = getSubjectTaxonomy(s.name)
                     if (examMode === 'mock_subject' && taxonomy) {
                       setStep('area_choice')
+                    } else if (examMode === 'mock_full' || examMode === 'mock_subject') {
+                      // 모의고사: 실제 시험과 동일한 고정 문항수·시간으로 바로 미리보기 생성(임의 선택 불가)
+                      const spec = getOfficialMockSpec(s.name)
+                      runPreview({
+                        subject: s.id,
+                        subjectName: s.name,
+                        examType: 'FULL_MOCK',
+                        questionCount: spec.questionCount,
+                        timeLimitMinutes: spec.timeLimitMinutes,
+                        difficulty: 'mixed',
+                      })
                     } else {
                       goStep(1)
                     }
@@ -307,7 +325,11 @@ export default function ExamBuilder() {
             <p className="text-sm text-gray-500 mb-4">어떤 방식으로 응시할까요?</p>
             <div className="space-y-2.5">
               <button
-                onClick={() => { setAreaChoice('full'); setTargetMajorAreaName(''); setTargetMajorAreaId(''); runPreview({ examType: 'FULL_MOCK' }) }}
+                onClick={() => {
+                  setAreaChoice('full'); setTargetMajorAreaName(''); setTargetMajorAreaId('')
+                  const spec = getOfficialMockSpec(subjectName)
+                  runPreview({ examType: 'FULL_MOCK', questionCount: spec.questionCount, timeLimitMinutes: spec.timeLimitMinutes, difficulty: 'mixed' })
+                }}
                 className="w-full text-left p-4 rounded-card border-2 border-gray-100 bg-white hover:border-primary-300 transition-all"
               >
                 <p className="font-bold text-gray-900 text-sm">전체 모의고사</p>
@@ -425,7 +447,7 @@ export default function ExamBuilder() {
           <div className="space-y-6">
             <div>
               <h2 className="text-lg font-black text-gray-900 mb-3">문제 수</h2>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 {countPresets.map((c) => (
                   <button
                     key={c}
@@ -458,6 +480,29 @@ export default function ExamBuilder() {
                     <span className={d.color}>{d.label}</span>
                   </button>
                 ))}
+              </div>
+            </div>
+            <div>
+              <h2 className="text-lg font-black text-gray-900 mb-1">목표 점수 (선택)</h2>
+              <p className="text-xs text-gray-500 mb-3">목표보다 높은 점수를 받으면 보너스 🪙 {TARGET_SCORE_BONUS.tokens} TOKEN (₩{TARGET_SCORE_BONUS.won.toLocaleString()} 상당)을 드려요</p>
+              <div className="grid grid-cols-4 gap-2">
+                {[70, 80, 90].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setTargetScore(targetScore === s ? undefined : s)}
+                    className={`py-3 rounded-card border-2 font-bold text-sm transition-all
+                      ${targetScore === s ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100 bg-white text-gray-700'}`}
+                  >
+                    {s}점
+                  </button>
+                ))}
+                <button
+                  onClick={() => setTargetScore(undefined)}
+                  className={`py-3 rounded-card border-2 font-bold text-sm transition-all
+                    ${targetScore === undefined ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100 bg-white text-gray-400'}`}
+                >
+                  안 함
+                </button>
               </div>
             </div>
             <Button fullWidth size="lg" onClick={() => runPreview({})}>
@@ -504,6 +549,13 @@ export default function ExamBuilder() {
                   <span className="text-sm text-gray-500">사용 토큰</span>
                   <span className="font-black text-amber-500">🪙 {blueprint.tokenCost} TOKEN</span>
                 </div>
+                {previewConfig?.targetScore !== undefined && (
+                  <div className="pt-4 border-t border-gray-50 bg-amber-50 -mx-5 -mb-5 px-5 py-3 rounded-b-card">
+                    <p className="text-xs font-semibold text-amber-700">
+                      🎯 목표 점수 {previewConfig.targetScore}점 초과 달성 시 보너스 🪙 {TARGET_SCORE_BONUS.tokens} TOKEN (₩{TARGET_SCORE_BONUS.won.toLocaleString()} 상당)
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
