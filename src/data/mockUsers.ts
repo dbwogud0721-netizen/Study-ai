@@ -1,4 +1,6 @@
 import { StudentUser, ParentUser } from '../types'
+import { INITIAL_TOKENS } from '../config/tokenConfig'
+import { TOKEN_PACKAGES } from '../config/tokenEconomyConfig'
 import { CURRENT_CURRICULUM_VERSION, getExamSystemVersion } from '../config/curriculumConfig'
 
 const studentEntryYear = 2027
@@ -11,7 +13,7 @@ export const MOCK_STUDENT: StudentUser = {
   schoolLevel: 'middle',
   grade: 3,
   interests: ['math', 'sci'],
-  tokens: 87,
+  tokens: 12,
   streak: 7,
   lastStudyDate: new Date().toISOString().split('T')[0],
   createdAt: '2024-03-01T00:00:00Z',
@@ -33,6 +35,18 @@ export const MOCK_PARENT: ParentUser = {
   streak: 0,
   createdAt: '2024-03-01T00:00:00Z',
   linkedStudentIds: ['student_001'],
+  pendingPaymentRequests: [
+    {
+      id: 'pay_seed_001',
+      studentId: 'student_001',
+      studentName: '박인성',
+      productId: TOKEN_PACKAGES[1].id,
+      tokens: TOKEN_PACKAGES[1].tokens,
+      price: TOKEN_PACKAGES[1].price,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    },
+  ],
 }
 
 export const MOCK_ACCOUNTS = [

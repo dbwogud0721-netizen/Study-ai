@@ -15,6 +15,8 @@ import { PositionHeatmap } from '../components/features/PositionHeatmap'
 import { useAppStore } from '../hooks/useAppStore'
 import { getSubjectTaxonomy } from '../config/curriculumConfig'
 import { getExamHistory } from '../services/examService'
+import { spendForExam } from '../services/tokenService'
+import { saveUser } from '../services/authService'
 import {
   calculateOverallScore,
   calculateAreaAccuracy,
@@ -55,7 +57,7 @@ function filterByPeriod(history: ExamResult[], period: AnalysisPeriod): ExamResu
 
 export default function GradeDashboard() {
   const navigate = useNavigate()
-  const { user, setPendingExamConfig, setPendingBlueprint } = useAppStore()
+  const { user, setUser, setPendingExamConfig, setPendingBlueprint } = useAppStore()
   const student = user as StudentUser
 
   const allHistory = useMemo(() => getExamHistory(student.id), [student.id])
@@ -118,6 +120,7 @@ export default function GradeDashboard() {
       totalQuestions: 10,
       distribution: [{ label, count: 10 }],
       estimatedMinutes: 18,
+      tokenCost: 0,
     }
     setPendingExamConfig(config)
     setPendingBlueprint(bp)
@@ -125,7 +128,7 @@ export default function GradeDashboard() {
   }
 
   function startRecommendedExam() {
-    if (!recommended) return
+    if (!recommended || student.tokens < recommended.tokenCost) return
     const config: ExamConfig = {
       schoolLevel: student.schoolLevel,
       grade: student.grade,
@@ -137,6 +140,10 @@ export default function GradeDashboard() {
       questionCount: recommended.totalQuestions,
       timeLimitMinutes: recommended.estimatedMinutes,
     }
+    const wallet = spendForExam(student.id, recommended.tokenCost, `${recommended.title} 응시`)
+    const updatedUser: StudentUser = { ...student, tokens: wallet.balance }
+    saveUser(updatedUser)
+    setUser(updatedUser)
     setPendingExamConfig(config)
     setPendingBlueprint(recommended)
     navigate('/exam/generating')
@@ -381,6 +388,7 @@ export default function GradeDashboard() {
               subtitle={recommended.rationale}
               questionCount={recommended.totalQuestions}
               minutes={recommended.estimatedMinutes}
+              tokenCost={recommended.tokenCost}
               size="lg"
               onClick={startRecommendedExam}
             />

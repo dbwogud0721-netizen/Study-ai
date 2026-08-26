@@ -1,5 +1,6 @@
 import { MOCK_ACCOUNTS, MOCK_STUDENT, MOCK_PARENT } from '../data/mockUsers'
 import { User, StudentUser, ParentUser, SchoolLevel, Grade, LearningGoal } from '../types'
+import { INITIAL_TOKENS } from '../config/tokenConfig'
 import { CURRENT_CURRICULUM_VERSION, getExamSystemVersion } from '../config/curriculumConfig'
 import { estimateEntryYear } from '../utils/academicYear'
 
@@ -74,8 +75,7 @@ export function createStudentProfile(input: CreateStudentProfileInput): StudentU
     schoolLevel: input.schoolLevel,
     grade: input.grade,
     interests: input.selectedSubjects,
-    // 학생은 학습 성과를 달성해야만 Reward Token을 획득한다 — 가입 시 지급 없음.
-    tokens: 0,
+    tokens: INITIAL_TOKENS,
     streak: 0,
     createdAt: new Date().toISOString(),
     entryYear,

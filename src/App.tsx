@@ -5,7 +5,6 @@ import { User, ExamConfig, ExamBlueprint, Question, StudentUser } from './types'
 import type { ExamResult as ExamResultData } from './types'
 import { getCurrentUser } from './services/authService'
 import { seedDemoHistoryIfEmpty } from './services/examService'
-import { seedDemoRewardDataIfEmpty } from './services/tokenService'
 
 import Onboarding from './pages/Onboarding'
 import Login from './pages/Login'
@@ -16,7 +15,7 @@ import Exam from './pages/Exam'
 import ExamResultPage from './pages/ExamResult'
 import WrongAnswerAnalysis from './pages/WrongAnswerAnalysis'
 import GradeDashboard from './pages/GradeDashboard'
-import RewardPage from './pages/RewardPage'
+import TokenPage from './pages/TokenPage'
 import MyPage from './pages/MyPage'
 import ProfileEdit from './pages/ProfileEdit'
 import LearningSettings from './pages/LearningSettings'
@@ -59,7 +58,6 @@ export default function App() {
   useEffect(() => {
     if (user && user.accountType !== 'parent') {
       seedDemoHistoryIfEmpty(user.id)
-      seedDemoRewardDataIfEmpty(user.id)
     }
   }, [user])
 
@@ -90,7 +88,7 @@ export default function App() {
         <Route path="/result" element={<RequireStudent><ExamResultPage /></RequireStudent>} />
         <Route path="/wrong-analysis/:examId/:questionId" element={<RequireStudent><WrongAnswerAnalysis /></RequireStudent>} />
         <Route path="/grades" element={<RequireStudent><GradeDashboard /></RequireStudent>} />
-        <Route path="/rewards" element={<RequireStudent><RewardPage /></RequireStudent>} />
+        <Route path="/tokens" element={<RequireStudent><TokenPage /></RequireStudent>} />
         <Route path="/my" element={<RequireStudent><MyPage /></RequireStudent>} />
         <Route path="/my/profile" element={<RequireStudent><ProfileEdit /></RequireStudent>} />
         <Route path="/my/settings" element={<RequireStudent><LearningSettings /></RequireStudent>} />
@@ -100,7 +98,7 @@ export default function App() {
         <Route path="/problem-maker" element={<RequireStudent><ProblemMaker /></RequireStudent>} />
 
         <Route path="/parent" element={<RequireAuth><ParentDashboard /></RequireAuth>} />
-        <Route path="/parent/payment" element={<RequireAuth><PaymentConfirm /></RequireAuth>} />
+        <Route path="/parent/payment/:requestId" element={<RequireAuth><PaymentConfirm /></RequireAuth>} />
 
         {/* 기존 경로 호환 */}
         <Route path="/questions" element={<Navigate to="/exam/new" replace />} />

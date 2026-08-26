@@ -1,98 +1,84 @@
 import { describe, it, expect } from 'vitest'
-import { splitSubscriptionPayment, tokensToKrw, krwToTokens } from '../tokenEconomyConfig'
-import { calculateScoreReward } from '../tokenConfig'
-import { deriveWallet, capRewardByPool } from '../../services/tokenService'
-import { RewardTransaction } from '../../types'
+import { computeConversion, getMaxConvertibleTokens } from '../tokenEconomyConfig'
+import { deriveWallet, splitSpendAcrossSources } from '../../services/tokenService'
+import { TokenTransaction } from '../../types'
 
-function tx(tokenAmount: number): RewardTransaction {
+function tx(tokenSource: 'PURCHASED' | 'REWARD', amount: number): TokenTransaction {
   return {
     id: `t_${Math.random()}`,
-    studentId: 's1',
-    tokenAmount,
-    valueKrw: tokensToKrw(tokenAmount),
-    type: tokenAmount >= 0 ? 'EXAM_REWARD' : 'REDEEM_KAKAOPAY',
+    userId: 'u1',
+    type: amount >= 0 ? 'EARN' : 'SPEND',
+    tokenSource,
+    amount,
     reason: 'test',
     createdAt: new Date().toISOString(),
+    balanceAfter: 0,
   }
 }
 
-describe('splitSubscriptionPayment', () => {
-  it('₩100,000 결제 -> 기본 50/50 분할로 서비스이용료 ₩50,000, Reward Pool ₩50,000', () => {
-    const r = splitSubscriptionPayment(100000)
-    expect(r.serviceFeeKrw).toBe(50000)
-    expect(r.rewardPoolKrw).toBe(50000)
+describe('computeConversion', () => {
+  it('10 Reward Token -> 가치 ₩1,000, 수수료 10% ₩100, 지급 ₩900', () => {
+    const r = computeConversion(10)
+    expect(r.grossAmount).toBe(1000)
+    expect(r.feeAmount).toBe(100)
+    expect(r.netAmount).toBe(900)
   })
 
-  it('비율을 바꾸면(config) 분할도 바뀐다 — 서비스이용료 70%', () => {
-    const r = splitSubscriptionPayment(100000, 0.3)
-    expect(r.rewardPoolKrw).toBe(30000)
-    expect(r.serviceFeeKrw).toBe(70000)
+  it('50 Reward Token -> 가치 ₩5,000, 수수료 10% ₩500, 지급 ₩4,500', () => {
+    const r = computeConversion(50)
+    expect(r.grossAmount).toBe(5000)
+    expect(r.feeAmount).toBe(500)
+    expect(r.netAmount).toBe(4500)
+  })
+
+  it('100 Reward Token -> 가치 ₩10,000, 수수료 10% ₩1,000, 지급 ₩9,000', () => {
+    const r = computeConversion(100)
+    expect(r.grossAmount).toBe(10000)
+    expect(r.feeAmount).toBe(1000)
+    expect(r.netAmount).toBe(9000)
   })
 })
 
-describe('tokensToKrw / krwToTokens (1 Token = ₩100)', () => {
-  it('10 Token -> ₩1,000', () => {
-    expect(tokensToKrw(10)).toBe(1000)
-  })
-
-  it('₩1,300 -> 13 Token (내림)', () => {
-    expect(krwToTokens(1300)).toBe(13)
-  })
-
-  it('₩1,399 -> 13 Token (100원 미만 절사)', () => {
-    expect(krwToTokens(1399)).toBe(13)
+describe('getMaxConvertibleTokens', () => {
+  it('57 Reward Token -> 1개 단위이므로 그대로 57 전액 전환 가능', () => {
+    const max = getMaxConvertibleTokens(57)
+    expect(max).toBe(57)
+    expect(57 - max).toBe(0)
   })
 })
 
-describe('calculateScoreReward', () => {
-  it('100점 -> 10 TOKEN', () => {
-    expect(calculateScoreReward(100)).toBe(10)
+describe('deriveWallet + getMaxConvertibleTokens (지갑 구성, 구매+리워드 합산 전환)', () => {
+  it('22 Purchased + 50 Reward -> 총 Token 72, 현금 전환 가능 Token 72', () => {
+    const wallet = deriveWallet([tx('PURCHASED', 22), tx('REWARD', 50)])
+    expect(wallet.balance).toBe(72)
+    expect(wallet.purchasedBalance).toBe(22)
+    expect(wallet.rewardBalance).toBe(50)
+    expect(getMaxConvertibleTokens(wallet.balance)).toBe(72)
   })
-  it('90~99점 -> 7 TOKEN', () => {
-    expect(calculateScoreReward(90)).toBe(7)
-    expect(calculateScoreReward(99)).toBe(7)
-  })
-  it('80~89점 -> 3 TOKEN', () => {
-    expect(calculateScoreReward(80)).toBe(3)
-    expect(calculateScoreReward(89)).toBe(3)
-  })
-  it('80점 미만 -> 0 TOKEN', () => {
-    expect(calculateScoreReward(79)).toBe(0)
-    expect(calculateScoreReward(0)).toBe(0)
+
+  it('Purchased Token만 50 -> 현금 전환 가능 Token 50 (구매 Token도 전환 대상)', () => {
+    const wallet = deriveWallet([tx('PURCHASED', 50)])
+    expect(wallet.rewardBalance).toBe(0)
+    expect(getMaxConvertibleTokens(wallet.balance)).toBe(50)
   })
 })
 
-describe('capRewardByPool (Reward Pool 한도를 넘는 지급 금지)', () => {
-  it('Pool 잔여가 충분하면 nominal 그대로 지급', () => {
-    const r = capRewardByPool(10, 50000)
-    expect(r.tokens).toBe(10)
-    expect(r.capped).toBe(false)
+describe('splitSpendAcrossSources (PURCHASED 우선 소진)', () => {
+  it('구매 잔액이 충분하면 전부 PURCHASED에서만 차감', () => {
+    const { fromPurchased, fromReward } = splitSpendAcrossSources(10, 20, 5)
+    expect(fromPurchased).toBe(5)
+    expect(fromReward).toBe(0)
   })
 
-  it('Pool 잔여 ₩1,300뿐인데 100점(₩1,000 상당) 달성 -> 전액 지급, 한도 안 넘음', () => {
-    const r = capRewardByPool(10, 1300)
-    expect(r.tokens).toBe(10)
-    expect(r.capped).toBe(false)
+  it('구매 잔액이 모자라면 부족분만 REWARD에서 차감', () => {
+    const { fromPurchased, fromReward } = splitSpendAcrossSources(2, 20, 5)
+    expect(fromPurchased).toBe(2)
+    expect(fromReward).toBe(3)
   })
 
-  it('Pool 잔여 ₩300뿐인데 100점(10 TOKEN=₩1,000) 달성 -> ₩300만큼인 3 TOKEN만 지급', () => {
-    const r = capRewardByPool(10, 300)
-    expect(r.tokens).toBe(3)
-    expect(r.capped).toBe(true)
-  })
-
-  it('Pool 잔여 0 -> 추가 Reward 지급 없음', () => {
-    const r = capRewardByPool(10, 0)
-    expect(r.tokens).toBe(0)
-    expect(r.capped).toBe(true)
-  })
-})
-
-describe('deriveWallet (획득 완료한 Reward Token만 잔액에 반영)', () => {
-  it('87 획득 - 50 사용 = 37 잔액', () => {
-    const wallet = deriveWallet([tx(50), tx(37), tx(-50)])
-    expect(wallet.earnedTotal).toBe(87)
-    expect(wallet.redeemedTotal).toBe(50)
-    expect(wallet.balance).toBe(37)
+  it('구매 잔액이 0이면 전부 REWARD에서 차감', () => {
+    const { fromPurchased, fromReward } = splitSpendAcrossSources(0, 20, 5)
+    expect(fromPurchased).toBe(0)
+    expect(fromReward).toBe(5)
   })
 })

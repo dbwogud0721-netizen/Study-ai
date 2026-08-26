@@ -2,6 +2,7 @@ import { Question, ExamConfig, ExamBlueprint, BlueprintItem, ConceptAnalysis, Qu
 import { MOCK_QUESTIONS } from '../data/mockQuestions'
 import { MOCK_CONCEPT_STRENGTHS } from '../data/mockExamHistory'
 import { getExamModeDef } from '../config/examModeConfig'
+import { EXAM_TOKEN_COST } from '../config/tokenConfig'
 import { getFullMockBlueprint, getSubjectTaxonomy } from '../config/curriculumConfig'
 import { generateRecommendedExam as generateRecommendedExamFromHistory } from './analytics'
 
@@ -63,6 +64,7 @@ export async function generateExamBlueprint(
 ): Promise<ExamBlueprint> {
   await delay(500)
   const modeDef = getExamModeDef(config.schoolLevel, config.examMode)
+  const tokenCost = EXAM_TOKEN_COST
 
   // AI 취약영역 모의고사: 실 이력이 충분하면 Analytics Engine의 추천 결과를 그대로 사용(섹션 16)
   if (config.examMode === 'weakness_ai' && weaknessSource && weaknessSource.attempts.length >= 10) {
@@ -81,6 +83,7 @@ export async function generateExamBlueprint(
       totalQuestions,
       distribution: full?.distribution ?? buildBalancedDistribution(topicPool, totalQuestions),
       estimatedMinutes,
+      tokenCost,
       rationale: '실제 수능과 동일한 문항수·시간으로 구성했어요',
     }
   }
@@ -100,6 +103,7 @@ export async function generateExamBlueprint(
         totalQuestions: config.questionCount,
         distribution,
         estimatedMinutes: config.timeLimitMinutes,
+        tokenCost,
       }
     }
   }
@@ -120,6 +124,7 @@ export async function generateExamBlueprint(
     totalQuestions: config.questionCount,
     distribution,
     estimatedMinutes: config.timeLimitMinutes,
+    tokenCost,
   }
 }
 

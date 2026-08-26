@@ -51,6 +51,7 @@ export interface ExamBlueprint {
   totalQuestions: number
   distribution: BlueprintItem[]
   estimatedMinutes: number
+  tokenCost: number
   /** AI 추천 시험 구성 사유 ("최근 오답을 분석하여 구성했어요") */
   rationale?: string
 }
@@ -75,10 +76,10 @@ export interface ExamResult {
   previousScore?: number
   scoreDelta?: number
   flaggedQuestionIds?: string[]
+  /** 목표 점수 달성 보너스 (섹션: 목표점수 초과 시 ₩5,000 상당 토큰 지급) */
   targetScore?: number
   targetScoreMet?: boolean
-  /** Reward Pool 잔여 한도 부족으로 점수 구간 보상이 일부만 지급됐는지 여부 */
-  rewardCapped?: boolean
+  targetScoreBonusTokens?: number
 }
 
 export interface ConceptAnalysis {
