@@ -127,3 +127,16 @@ export function getStreakBonus(streak: number): number {
   if (streak >= 7) return TOKEN_REWARDS.streak_7day
   return 0
 }
+
+/**
+ * 게임/웹툰 등 파트너 리워드 교환 소비(카카오페이 현금 전환과 완전히 독립).
+ * spendForExam과 동일하게 PURCHASED 우선 소진. Provider의 redeem 성공을 확인한
+ * 뒤에만 호출해야 한다.
+ */
+export function spendForPartnerReward(userId: string, amount: number, reason: string): TokenWallet {
+  const wallet = getWallet(userId)
+  const { fromPurchased, fromReward } = splitSpendAcrossSources(wallet.purchasedBalance, wallet.rewardBalance, amount)
+  if (fromPurchased > 0) appendTransaction(userId, 'SPEND', 'PURCHASED', fromPurchased, reason)
+  if (fromReward > 0) appendTransaction(userId, 'SPEND', 'REWARD', fromReward, reason)
+  return getWallet(userId)
+}

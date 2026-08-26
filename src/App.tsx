@@ -25,6 +25,8 @@ import Help from './pages/Help'
 import ParentDashboard from './pages/ParentDashboard'
 import PaymentConfirm from './pages/PaymentConfirm'
 import ProblemMaker from './pages/ProblemMaker'
+import GameRewardPage from './pages/GameRewardPage'
+import WebtoonRewardPage from './pages/WebtoonRewardPage'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const user = getCurrentUser()
@@ -89,6 +91,8 @@ export default function App() {
         <Route path="/wrong-analysis/:examId/:questionId" element={<RequireStudent><WrongAnswerAnalysis /></RequireStudent>} />
         <Route path="/grades" element={<RequireStudent><GradeDashboard /></RequireStudent>} />
         <Route path="/tokens" element={<RequireStudent><TokenPage /></RequireStudent>} />
+        <Route path="/rewards/game" element={<RequireStudent><GameRewardPage /></RequireStudent>} />
+        <Route path="/rewards/webtoon" element={<RequireStudent><WebtoonRewardPage /></RequireStudent>} />
         <Route path="/my" element={<RequireStudent><MyPage /></RequireStudent>} />
         <Route path="/my/profile" element={<RequireStudent><ProfileEdit /></RequireStudent>} />
         <Route path="/my/settings" element={<RequireStudent><LearningSettings /></RequireStudent>} />

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Plus, ArrowUpCircle, ArrowDownCircle, Gift, Check, Minus, Wallet } from 'lucide-react'
 import { MobileLayout } from '../components/layout/MobileLayout'
 import { BottomNav } from '../components/layout/BottomNav'
@@ -19,6 +19,7 @@ import { formatDateFull } from '../utils/formatters'
 import { StudentUser } from '../types'
 
 export default function TokenPage() {
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { user, setUser } = useAppStore()
   const student = user as StudentUser
@@ -135,6 +136,22 @@ export default function TokenPage() {
             <Button fullWidth variant="secondary" disabled={maxConvertible === 0} onClick={openConvert}>
               카카오페이로 받기
             </Button>
+          </div>
+        </div>
+
+        <div className="px-5 mt-4">
+          <h3 className="font-bold text-gray-900 mb-2 px-1">다른 보상으로 바꾸기</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={() => navigate('/rewards/game')} className="bg-white rounded-card border-2 border-gray-100 p-4 text-left">
+              <span className="text-2xl">🎮</span>
+              <p className="text-sm font-bold text-gray-900 mt-2">게임</p>
+              <p className="text-xs text-gray-400 mt-0.5">게임머니로 바꾸기</p>
+            </button>
+            <button onClick={() => navigate('/rewards/webtoon')} className="bg-white rounded-card border-2 border-gray-100 p-4 text-left">
+              <span className="text-2xl">🍪</span>
+              <p className="text-sm font-bold text-gray-900 mt-2">웹툰</p>
+              <p className="text-xs text-gray-400 mt-0.5">웹툰 재화로 바꾸기</p>
+            </button>
           </div>
         </div>
 
