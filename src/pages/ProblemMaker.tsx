@@ -4,12 +4,11 @@ import { AlertTriangle, Sparkles } from 'lucide-react'
 import { MobileLayout } from '../components/layout/MobileLayout'
 import { AppHeader } from '../components/layout/AppHeader'
 import { Button } from '../components/ui/Button'
-import { Card } from '../components/ui/Card'
 import { ProgressBar } from '../components/ui/ProgressBar'
 import { BottomSheet } from '../components/ui/BottomSheet'
 import { useAppStore } from '../hooks/useAppStore'
 import { getCurriculumSubjects } from '../config/curriculumConfig'
-import { generateMathProblems, computeSolutionSimilarity } from '../services/problemGeneratorService'
+import { generateMathProblems } from '../services/problemGeneratorService'
 import { GeneratedProblem } from '../types/problemGenerator'
 import { StudentUser } from '../types'
 
@@ -18,7 +17,6 @@ type Step = 'home' | 'confirm' | 'settings' | 'generating' | 'result'
 const DIFFICULTY_LEVELS = [1, 2, 3, 4]
 const DIFFICULTY_WARNING = '(난이도 3 이상은 학습영역의 결합문제 또는\n주관식 문제로 출제될 수 있습니다.)'
 const TIMEOUT_MS = 60000
-const CIRCLED_NUMS = ['①', '②', '③', '④', '⑤']
 
 export default function ProblemMaker() {
   const navigate = useNavigate()
@@ -33,8 +31,6 @@ export default function ProblemMaker() {
   const [timedOut, setTimedOut] = useState(false)
 
   const [problems, setProblems] = useState<GeneratedProblem[] | null>(null)
-  const [activeTab, setActiveTab] = useState(0)
-  const [revealed, setRevealed] = useState<Record<string, number>>({}) // problemId -> 섹션3 유사도(%)
 
   const subjects = getCurriculumSubjects(student.schoolLevel, student.grade)
 
@@ -58,13 +54,7 @@ export default function ProblemMaker() {
       return
     }
     setProblems(result)
-    setActiveTab(0)
-    setRevealed({})
     setStep('result')
-  }
-
-  function revealSolution(id: string) {
-    setRevealed((prev) => (id in prev ? prev : { ...prev, [id]: computeSolutionSimilarity() }))
   }
 
   function handleBack() {
@@ -172,28 +162,13 @@ export default function ProblemMaker() {
           </div>
         )}
 
-        {/* 4. 결과 */}
+        {/* 4. 결과 — 생성됨 표시만 */}
         {step === 'result' && problems && problems.length > 0 && (
-          <div>
-            <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
-              {problems.map((p, i) => (
-                <button
-                  key={p.id}
-                  onClick={() => setActiveTab(i)}
-                  className={`flex-shrink-0 px-4 h-10 rounded-full font-bold text-sm transition-all
-                    ${activeTab === i ? 'bg-primary-500 text-white' : 'bg-white text-gray-500 border border-gray-100'}`}
-                >
-                  문제{p.index}
-                </button>
-              ))}
-            </div>
-
-            <ResultPanel
-              problem={problems[activeTab]}
-              similarityAfterReveal={revealed[problems[activeTab].id]}
-              onReveal={() => revealSolution(problems[activeTab].id)}
-              onBackToSettings={() => setStep('settings')}
-            />
+          <div className="flex flex-col items-center justify-center pt-16 gap-4 text-center">
+            <div className="w-16 h-16 bg-primary-50 rounded-full flex items-center justify-center text-3xl">✅</div>
+            <p className="text-base font-black text-gray-900">생성됨</p>
+            <p className="text-sm text-gray-500">{problems.length}문항이 생성되었습니다.</p>
+            <Button variant="primary" className="w-full mt-4" onClick={() => setStep('settings')}>다시 생성</Button>
           </div>
         )}
       </div>
@@ -210,103 +185,5 @@ export default function ProblemMaker() {
         </div>
       </BottomSheet>
     </MobileLayout>
-  )
-}
-
-function ResultPanel({
-  problem,
-  similarityAfterReveal,
-  onReveal,
-  onBackToSettings,
-}: {
-  problem: GeneratedProblem
-  similarityAfterReveal: number | undefined
-  onReveal: () => void
-  onBackToSettings: () => void
-}) {
-  const revealed = similarityAfterReveal !== undefined
-
-  const metaLines = [
-    { code: '1.1', label: '출제영역', content: problem.area },
-    { code: '1.2', label: '결합영역', content: problem.combo },
-    { code: '1.3', label: '사용공식의 영역', content: problem.formulaArea },
-    { code: '1.4', label: '사용공식', content: `${problem.formula}, 미지수 개수: ${problem.unknownCount}, 조건분기수: ${problem.conditionBranch}, 차수개수: ${problem.degreeCount}` },
-    { code: '1.5', label: '난이도', content: `${problem.difficulty}, 연산지수: ${problem.opIndex}` },
-    { code: '1.6', label: '기존 기출문제와의 유사도', content: `${problem.similarity}%` },
-    { code: '1.7', label: '출제의도', content: problem.intent },
-  ]
-
-  return (
-    <div className="space-y-4">
-      {/* 1. 문항 + 지문/선택지 — 상하좌우 스크롤 */}
-      <Card padding="none">
-        <div className="overflow-auto max-h-72 p-4">
-          <p className="text-xs font-bold text-primary-500 mb-2">1. 문항번호 {problem.index}</p>
-          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap mb-3">{problem.problem}</p>
-          <div className="space-y-1.5">
-            {problem.choices.map((c, i) => (
-              <p key={i} className="text-sm text-gray-700">{CIRCLED_NUMS[i]} {c}</p>
-            ))}
-          </div>
-        </div>
-      </Card>
-
-      {/* 1.1 ~ 1.7 메타 정보 */}
-      <Card>
-        <div className="space-y-2">
-          {metaLines.map((m) => (
-            <p key={m.code} className="text-sm text-gray-700 leading-relaxed">
-              <span className="font-bold text-gray-900">{m.code} {m.label}</span>
-              <span className="text-gray-500"> : {m.content}</span>
-            </p>
-          ))}
-        </div>
-      </Card>
-
-      {/* 2. 출제 경향 예측 */}
-      <Card>
-        <p className="font-bold text-gray-900 mb-2">2. 27학년도 출제 경향 예측</p>
-        <p className="text-sm text-gray-700 mb-1"><span className="font-semibold">2.1 출제영역</span> : {problem.trendArea}</p>
-        <p className="text-sm text-gray-700">-<span className="font-semibold">2.2 결합영역의 내용</span> : {problem.trendCombo}</p>
-        <div className="mt-3 bg-gray-100 rounded-xl px-3 py-2.5">
-          <p className="text-sm text-gray-700">
-            문항 번호 {problem.index}에 대한 27학년도 수능수학 문제의 출제 예측 확률은 <span className="font-bold">{problem.predictProb}%</span>입니다.
-          </p>
-        </div>
-      </Card>
-
-      {/* 검산 확인 */}
-      <div className="flex items-center justify-between px-1">
-        <p className="text-sm font-semibold text-gray-700">검산하여 풀이 할까요?</p>
-        <div className="flex gap-2">
-          <Button size="sm" variant="secondary" onClick={onBackToSettings}>아니오</Button>
-          <Button size="sm" variant="primary" onClick={onReveal}>예</Button>
-        </div>
-      </div>
-
-      {revealed && (
-        <>
-          <Card>
-            <h3 className="font-bold text-gray-900 mb-2">문항번호 {problem.index} 풀이및 답</h3>
-            <div className="overflow-auto max-h-56">
-              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap mb-3">{problem.solution}</p>
-            </div>
-            <div className="pt-3 border-t border-gray-50 flex items-center justify-between">
-              <span className="text-sm text-gray-500">정답</span>
-              <span className="font-black text-primary-600">{CIRCLED_NUMS[problem.answer - 1]} {problem.answer}번</span>
-            </div>
-          </Card>
-
-          <Card>
-            <h3 className="font-bold text-gray-900 mb-3">3. 기출문제와의 유사도</h3>
-            <div className="flex justify-between text-sm mb-1">
-              <span className="text-gray-700">유사도</span>
-              <span className="font-bold text-gray-900">{similarityAfterReveal}%</span>
-            </div>
-            <ProgressBar value={similarityAfterReveal ?? 0} color={(similarityAfterReveal ?? 0) >= 70 ? 'bg-red-400' : (similarityAfterReveal ?? 0) >= 40 ? 'bg-yellow-400' : 'bg-green-400'} />
-          </Card>
-        </>
-      )}
-    </div>
   )
 }
